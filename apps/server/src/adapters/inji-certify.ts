@@ -78,7 +78,9 @@ function sdJwtConfig(didUrl: string) {
     metaDataDisplay: display('Certify Identity (SD-JWT)', '#7c1012'),
     displayOrder: [...SUBJECT_FIELDS],
     scope: 'playground_certify_identity_sd_jwt',
-    sdJwtClaims: subjectDefinition,
+    // Certify rejects pre-auth claims that are not declared here, so the validity window
+    // (fed into the template as iat/exp) must be declared as claims too.
+    sdJwtClaims: { ...subjectDefinition, iat: { display: [{ name: 'Issued at', locale: 'en' }] }, exp: { display: [{ name: 'Expires', locale: 'en' }] } },
   };
 }
 
@@ -105,14 +107,13 @@ export async function certifyDidKey(): Promise<string> {
   return `did:key:${vm.publicKeyMultibase}`;
 }
 
-/** Creates (or replaces) the playground's credential configurations in Certify. */
+/** Creates (or replaces) the playground's credential configurations in Certify (keyed by credentialConfigKeyId). */
 export async function upsertCertifyConfigs(runId: string, didUrl: string) {
-  const existing = (await traced<any[]>({ runId, step: 'Setup · List Certify configurations', from: 'playground', to: 'issuer', url: `${API}/credential-configurations` }).catch(() => ({ body: [] as any[] }))).body;
-  const list: any[] = Array.isArray(existing) ? existing : [];
   for (const cfg of [ldpConfig(didUrl), sdJwtConfig(didUrl)]) {
-    const found = list.find((c) => c.credentialConfigKeyId === cfg.credentialConfigKeyId);
-    if (found?.id ?? found?.configId) {
-      await traced({ runId, step: `Setup · Update ${cfg.credentialConfigKeyId}`, from: 'playground', to: 'issuer', method: 'PUT', url: `${API}/credential-configurations/${found.id ?? found.configId}`, body: cfg });
+    const url = `${API}/credential-configurations/${cfg.credentialConfigKeyId}`;
+    const existing = await traced({ runId, step: `Setup · Look up ${cfg.credentialConfigKeyId}`, from: 'playground', to: 'issuer', url, allowError: true });
+    if (existing.status === 200 && existing.body?.credentialFormat) {
+      await traced({ runId, step: `Setup · Update ${cfg.credentialConfigKeyId}`, from: 'playground', to: 'issuer', method: 'PUT', url, body: cfg });
     } else {
       await traced({ runId, step: `Setup · Create ${cfg.credentialConfigKeyId}`, from: 'playground', to: 'issuer', url: `${API}/credential-configurations`, body: cfg });
     }
@@ -127,15 +128,18 @@ export async function createCertifyOffer(runId: string, format: Format, opts: { 
   const until = opts.expired ? new Date(now - 35 * 86_400_000) : new Date(now + 365 * 86_400_000);
   const iso = (d: Date) => d.toISOString().replace(/\.\d+Z$/, 'Z');
   const txCode = opts.txCode ? String(Math.floor(1000 + Math.random() * 9000)) : undefined;
-  const claims: Record<string, unknown> = {
-    fullName: 'Asha Rao', dateOfBirth: '1994-03-12', nationality: 'IN', documentNumber: 'PG-4471-2026', email: 'asha.rao@example.org',
-    validFrom: iso(from), validUntil: iso(until),
-    iat: Math.floor(from.getTime() / 1000), exp: Math.floor(until.getTime() / 1000),
-  };
+  const subject = { fullName: 'Asha Rao', dateOfBirth: '1994-03-12', nationality: 'IN', documentNumber: 'PG-4471-2026', email: 'asha.rao@example.org' };
+  const claims: Record<string, unknown> = format === 'ldp_vc'
+    ? { ...subject, validFrom: iso(from), validUntil: iso(until) }
+    : { ...subject, iat: Math.floor(from.getTime() / 1000), exp: Math.floor(until.getTime() / 1000) };
   const res = await traced({
     runId, step: 'OpenID4VCI · Create offer (Inji Certify /pre-authorized-data)', from: 'playground', to: 'issuer',
     url: `${API}/pre-authorized-data`,
     body: { credential_configuration_id: configId, claims, expires_in: 1800, ...(txCode ? { tx_code: txCode } : {}) },
   });
-  return { offerUri: res.body.credential_offer_uri as string, txCode, configId };
+  // MOSIP services report errors as HTTP 200 with an {errors:[…]} envelope.
+  if (res.body?.errors?.length) throw new Error(`Inji Certify rejected the offer: ${res.body.errors.map((e: any) => e.errorCode).join(', ')}`);
+  const offerUri = res.body?.credential_offer_uri ?? res.body?.response?.credential_offer_uri;
+  if (!offerUri) throw new Error(`Inji Certify returned no credential_offer_uri: ${JSON.stringify(res.body).slice(0, 200)}`);
+  return { offerUri: offerUri as string, txCode, configId };
 }

@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import { PUBLIC_BASE_URL } from '../config.js';
 import { correlate, emit, runIdFor } from '../events.js';
-import { verifyLdpPresentation } from '../formats/ldp.js';
+import { verifyLdpPresentation, didKeyFragmentDeviations } from '../formats/ldp.js';
 import { verifySdJwt } from '../formats/sdjwt.js';
 import { verifyMdocPresentation } from '../formats/mdoc.js';
 import { decodeArtefacts } from '../util/decode.js';
@@ -137,8 +137,14 @@ async function evaluate(req: VpRequest, body: Record<string, string>): Promise<V
     add('Issuer proof (credential signature)', r.credentialsValid, r.credentialsValid ? vc?.proof?.type : r.errors.join('; '));
     add('Holder proof (VP signature, challenge=nonce, domain=client_id)', r.holderProofValid,
       r.holderProofValid ? `holder ${vp.holder}` : r.errors.filter((e) => /challenge|domain|presentation|proof/i.test(e)).join('; ') || r.errors.join('; '));
-    const subjectId = vc?.credentialSubject?.id;
-    add('Holder is the credential subject', !subjectId || subjectId === vp.holder, `subject=${subjectId ?? '∅'}, holder=${vp.holder}`);
+    const subjectId: string | undefined = vc?.credentialSubject?.id;
+    const subjectDid = subjectId?.split('#')[0];
+    add('Holder is the credential subject', !subjectId || subjectDid === vp.holder,
+      `subject=${subjectId ?? '∅'}, holder=${vp.holder}${subjectId?.includes('#') ? ' (note: subject id is a DID URL with fragment, not a DID)' : ''}`);
+    const vm: string | undefined = vc?.proof?.verificationMethod;
+    if (vm && didKeyFragmentDeviations.has(vm)) {
+      add('did:key verificationMethod fragment is the key fingerprint', true, `non-standard fragment accepted: ${vm.split('#')[1]}`);
+    }
     const types: string[] = [].concat(vc?.type ?? []);
     if (req.expectation.type) add(`Credential type includes ${req.expectation.type}`, types.includes(req.expectation.type), types.join(', '));
     expired = r.expired;

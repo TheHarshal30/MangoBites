@@ -143,7 +143,7 @@ export async function issuerCertificate(): Promise<{ pem: string; derB64: string
   const root = await x509.X509CertificateGenerator.createSelfSigned({
     serialNumber: '01',
     name: 'CN=Inji Interop Playground IACA, C=IN',
-    notBefore: new Date(now - 86_400_000),
+    notBefore: new Date(now - 3 * 365 * 86_400_000),
     notAfter: new Date(now + 10 * 365 * 86_400_000),
     keys: rootKeys,
     signingAlgorithm: alg,
@@ -158,7 +158,7 @@ export async function issuerCertificate(): Promise<{ pem: string; derB64: string
     serialNumber: '02',
     subject: 'CN=Inji Interop Playground Issuer, C=IN',
     issuer: root.subject,
-    notBefore: new Date(now - 86_400_000),
+    notBefore: new Date(now - 3 * 365 * 86_400_000),
     notAfter: new Date(now + 5 * 365 * 86_400_000),
     publicKey,
     signingKey: rootKeys.privateKey,

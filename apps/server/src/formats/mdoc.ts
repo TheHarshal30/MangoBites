@@ -71,7 +71,7 @@ export async function verifyMdocPresentation(b64: string, t: { mdocGeneratedNonc
   const until = docs[0]?.validityInfo?.validUntil;
   const expired = until ? new Date(until).getTime() < Date.now() : false;
   // The library reports an expired MSO as an ISSUER_AUTH failure; separate it so EXPIRED ≠ INVALID.
-  const onlyExpiry = errors.length > 0 && errors.every((e) => /validity|valid until|expired/i.test(e));
+  const onlyExpiry = errors.length > 0 && errors.every((e) => /validity period of the certificate|valid at the time of verification|valid until|expired/i.test(e));
   return {
     issuerAuthValid: !failed.has('ISSUER_AUTH') || onlyExpiry,
     deviceAuthValid: !failed.has('DEVICE_AUTH'),

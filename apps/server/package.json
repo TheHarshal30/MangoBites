@@ -3,11 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts",
-    "build": "tsc --noEmit",
-    "interop": "tsx src/cli/interop.ts",
-    "test": "tsx --test src/**/*.test.ts"
+    "dev": "node --import tsx --watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "node ../../node_modules/typescript/bin/tsc -p .",
+    "setup": "node --import tsx src/cli/setup.ts",
+    "interop": "node --import tsx src/cli/interop.ts",
+    "test": "node --import tsx --test src/**/*.test.ts"
   },
   "dependencies": {
     "@auth0/mdl": "^3.0.1",

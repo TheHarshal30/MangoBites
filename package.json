@@ -2,13 +2,17 @@
   "name": "inji-interop-playground",
   "private": true,
   "version": "0.1.0",
-  "description": "Inji Interoperability Playground: issue → hold → present → verify across Inji Certify, wallets and Inji Verify with a live protocol inspector",
-  "workspaces": ["apps/server", "apps/web"],
+  "description": "Inji Interoperability Playground: issue \u2192 hold \u2192 present \u2192 verify across Inji Certify, wallets and Inji Verify with a live protocol inspector",
+  "workspaces": [
+    "apps/server",
+    "apps/web"
+  ],
   "scripts": {
     "dev": "npm run dev -w apps/server & npm run dev -w apps/web",
     "build": "npm run build -w apps/web && npm run build -w apps/server",
     "start": "npm run start -w apps/server",
     "interop": "npm run interop -w apps/server",
-    "test": "npm test -w apps/server"
+    "test": "npm test -w apps/server",
+    "setup": "npm run setup -w apps/server"
   }
 }

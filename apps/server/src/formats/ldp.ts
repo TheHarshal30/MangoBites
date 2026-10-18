@@ -35,19 +35,24 @@ const remoteCache = new Map<string, unknown>();
  * record it so the inspector can flag the deviation.
  */
 export const didKeyFragmentDeviations = new Set<string>();
+const extraFragments = new Map<string, Set<string>>();
 
 function didKeyDocument(did: string, fragment?: string) {
   const fingerprint = did.slice('did:key:'.length);
   const key = Ed25519VerificationKey2020.fromFingerprint({ fingerprint });
-  const ids = [...new Set([`${did}#${fingerprint}`, ...(fragment ? [`${did}#${fragment}`] : [])])];
-  if (fragment && fragment !== fingerprint) didKeyFragmentDeviations.add(`${did}#${fragment}`);
+  if (fragment && fragment !== fingerprint) {
+    didKeyFragmentDeviations.add(`${did}#${fragment}`);
+    extraFragments.set(did, (extraFragments.get(did) ?? new Set()).add(fragment));
+  }
+  // The controller document must list the non-standard id too, or the assertionMethod check fails.
+  const ids = [`${did}#${fingerprint}`, ...[...(extraFragments.get(did) ?? [])].map((f) => `${did}#${f}`)];
   const vms = ids.map((id) => ({ id, type: 'Ed25519VerificationKey2020', controller: did, publicKeyMultibase: key.publicKeyMultibase }));
   return {
     doc: {
       '@context': ['https://www.w3.org/ns/did/v1', 'https://w3id.org/security/suites/ed25519-2020/v1'],
       id: did, verificationMethod: vms, assertionMethod: ids, authentication: ids,
     },
-    vm: vms[vms.length - 1],
+    vm: vms.find((v) => v.id === `${did}#${fragment ?? fingerprint}`) ?? vms[0],
   };
 }
 
@@ -89,12 +94,14 @@ export async function documentLoader(url: string) {
 export async function issueLdp(issuer: EdKey, credential: Record<string, unknown>) {
   const key = await Ed25519VerificationKey2020.from(issuer.exported);
   const suite = new Ed25519Signature2020({ key });
-  return vc.issue({ credential, suite, documentLoader });
+  // Sign "as of" the issuance date so deliberately expired test credentials can be produced.
+  return vc.issue({ credential, suite, documentLoader, now: issuanceInstant(credential) });
 }
 
 export async function presentLdp(holder: EdKey, credentials: unknown[], challenge: string, domain: string) {
   const key = await Ed25519VerificationKey2020.from(holder.exported);
-  const presentation = vc.createPresentation({ verifiableCredential: credentials, holder: holder.did });
+  // `now` = issuance time: the holder may still present an expired credential; judging it is the verifier's job.
+  const presentation = vc.createPresentation({ verifiableCredential: credentials, holder: holder.did, now: issuanceInstant(credentials[0]) });
   return vc.signPresentation({ presentation, suite: new Ed25519Signature2020({ key }), challenge, domain, documentLoader });
 }
 
