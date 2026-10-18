@@ -126,11 +126,10 @@ export async function createCertifyOffer(runId: string, format: Format, opts: { 
   const now = Date.now();
   const from = opts.expired ? new Date(now - 400 * 86_400_000) : new Date(now);
   const until = opts.expired ? new Date(now - 35 * 86_400_000) : new Date(now + 365 * 86_400_000);
-  const iso = (d: Date) => d.toISOString().replace(/\.\d+Z$/, 'Z');
   const txCode = opts.txCode ? String(Math.floor(1000 + Math.random() * 9000)) : undefined;
   const subject = { fullName: 'Asha Rao', dateOfBirth: '1994-03-12', nationality: 'IN', documentNumber: 'PG-4471-2026', email: 'asha.rao@example.org' };
   const claims: Record<string, unknown> = format === 'ldp_vc'
-    ? { ...subject, validFrom: iso(from), validUntil: iso(until) }
+    ? subject // validFrom/validUntil are set by Certify itself for ldp_vc
     : { ...subject, iat: Math.floor(from.getTime() / 1000), exp: Math.floor(until.getTime() / 1000) };
   const res = await traced({
     runId, step: 'OpenID4VCI · Create offer (Inji Certify /pre-authorized-data)', from: 'playground', to: 'issuer',

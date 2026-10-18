@@ -12,7 +12,8 @@ export interface Party {
   formats: Format[];
   protocol: string;
   description: string;
-  supportsExpiredIssuance?: boolean;
+  /** Formats for which the issuer can be made to sign an already-expired credential. */
+  expiredIssuance?: Format[];
 }
 
 export const FORMATS: Record<Format, { label: string; short: string }> = {
@@ -26,13 +27,14 @@ export const PARTIES: Party[] = [
     id: 'inji-certify', role: 'issuer', name: 'Inji Certify', vendor: 'Inji', version: '0.14.0', mode: 'auto',
     formats: ['ldp_vc', 'vc+sd-jwt'], protocol: 'OpenID4VCI draft 13 · pre-authorized code',
     description: 'Inji Certify in DataProvider mode with PreAuthDataProviderPlugin, acting as its own authorization server (no eSignet).',
-    supportsExpiredIssuance: true,
+    // ldp_vc: Certify fills ${validFrom}/${validUntil} itself and ignores supplied values.
+    expiredIssuance: ['vc+sd-jwt'],
   },
   {
     id: 'playground-issuer', role: 'issuer', name: 'Reference Issuer', vendor: 'Reference (non-Inji)', version: 'playground', mode: 'auto',
     formats: ['ldp_vc', 'vc+sd-jwt', 'mso_mdoc'], protocol: 'OpenID4VCI draft 13 · pre-authorized code',
     description: 'Independent OpenID4VCI issuer built on digitalbazaar/vc, jose and @auth0/mdl — the non-Inji party in the matrix.',
-    supportsExpiredIssuance: true,
+    expiredIssuance: ['ldp_vc', 'vc+sd-jwt', 'mso_mdoc'],
   },
   {
     id: 'playground-wallet', role: 'wallet', name: 'Reference Wallet', vendor: 'Reference (non-Inji)', version: 'playground', mode: 'auto',

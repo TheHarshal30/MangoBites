@@ -10,7 +10,29 @@
 # bind-mounted, so the stack works from any checkout path (bind specs break on paths with ':').
 name: inji-playground
 
+x-context-mirror-hosts: &context-mirror-hosts
+  # www.w3.org rate-limits JSON-LD context fetches (Cloudflare 429), and Inji Certify/Verify
+  # fetch contexts on every request. Route them to the local mirror; delete these lines to use
+  # the real hosts.
+  extra_hosts:
+    - "www.w3.org:172.31.250.10"
+    - "w3.org:172.31.250.10"
+    - "w3id.org:172.31.250.10"
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+
 services:
+  context-mirror:
+    build: ./docker/context-mirror
+    image: inji-playground/context-mirror:1
+    networks:
+      default:
+        ipv4_address: 172.31.250.10
+
   database:
     build: ./docker/postgres
     image: inji-playground/postgres:15
@@ -18,6 +40,9 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports: ["5433:5432"]
+    volumes:
+      # Keep DB key metadata in step with Certify's persisted PKCS12 keystore (certify-keys).
+      - pg-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d inji_verify"]
       interval: 5s
@@ -27,8 +52,10 @@ services:
     build: ./docker/inji-certify
     image: inji-playground/inji-certify:0.14.0
     user: root
+    <<: *context-mirror-hosts
     depends_on:
       database: { condition: service_healthy }
+      context-mirror: { condition: service_started }
     environment:
       - active_profile_env=default,playground
       - SPRING_CONFIG_NAME=certify
@@ -54,10 +81,13 @@ services:
     ports: ["8090:8090"]
 
   verify-service:
-    image: mosipid/inji-verify-service:0.16.0
+    build: ./docker/inji-verify
+    image: inji-playground/inji-verify-service:0.16.0
     user: root
+    <<: *context-mirror-hosts
     depends_on:
       database: { condition: service_healthy }
+      context-mirror: { condition: service_started }
     ports: ["8082:8080"]
     environment:
       - active_profile_env=default
@@ -92,5 +122,6 @@ services:
       - playground-data:/app/apps/server/data
 
 volumes:
+  pg-data:
   certify-keys:
   playground-data:

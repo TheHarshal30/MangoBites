@@ -30,7 +30,11 @@ export async function traced<T = any>(req: TracedRequest): Promise<{ status: num
   if (req.body instanceof URLSearchParams) {
     headers['content-type'] ??= 'application/x-www-form-urlencoded';
     payload = req.body.toString();
-    loggedBody = Object.fromEntries(req.body.entries());
+    // Show JSON-valued form fields (vp_token, presentation_submission…) as structured JSON.
+    loggedBody = Object.fromEntries([...req.body.entries()].map(([k, v]) => {
+      if (/^\s*[[{]/.test(v)) { try { return [k, JSON.parse(v)]; } catch { /* leave as string */ } }
+      return [k, v];
+    }));
   } else if (typeof req.body === 'string') {
     payload = req.body;
   } else if (req.body !== undefined) {

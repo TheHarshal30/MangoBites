@@ -38,6 +38,16 @@ await waitFor('Inji Certify', certifyHealth);
 await waitFor('Inji Verify', verifyHealth);
 
 const did = await certifyDidKey();
+if (process.argv.includes('--print-did')) {
+  console.log(did);
+  process.exit(0);
+}
+if (process.argv.includes('--configs-only')) {
+  await waitFor('Inji Certify', certifyHealth);
+  await upsertCertifyConfigs('setup', did);
+  console.log(`▸ Inji Certify: ${(await certifyHealth()).detail}`);
+  process.exit(0);
+}
 const env = fs.existsSync(envFile) ? fs.readFileSync(envFile, 'utf8') : '';
 const current = /^CERTIFY_ISSUER_DID=(.*)$/m.exec(env)?.[1];
 if (current !== did) {

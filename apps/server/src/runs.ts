@@ -25,13 +25,16 @@ export interface RunInput {
   txCode?: boolean;
   /** Tag runs started by a matrix sweep so the dashboard can group them. */
   batchId?: string;
+  /** Set when this run re-executes a failed one (flakiness check). */
+  retryOf?: string;
 }
 
 type StageStatus = 'pending' | 'running' | 'done' | 'failed' | 'waiting' | 'skipped';
 
-export interface Run extends Required<Omit<RunInput, 'batchId'>> {
+export interface Run extends Required<Omit<RunInput, 'batchId' | 'retryOf'>> {
   id: string;
   batchId?: string;
+  retryOf?: string;
   createdAt: string;
   finishedAt?: string;
   durationMs?: number;
@@ -125,7 +128,7 @@ export function validateInput(input: RunInput): string | undefined {
   if (!TAMPER_MODES[tamper]) return `Unknown tamper mode ${tamper}`;
   if (tamper !== 'none' && wal.mode === 'manual') return 'Tamper modes need the Reference Wallet (a real wallet will not forge presentations)';
   if (tamper !== 'none' && !TAMPER_MODES[tamper].formats.includes(input.format)) return `Tamper "${tamper}" is not available for ${FORMATS[input.format].short}`;
-  if (input.expired && !iss.supportsExpiredIssuance) return `${iss.name} cannot issue already-expired credentials`;
+  if (input.expired && !iss.expiredIssuance?.includes(input.format)) return `${iss.name} cannot issue already-expired ${FORMATS[input.format].short} credentials`;
   if (input.verifier === 'inji-verify-direct' && ['replay', 'wrong-holder'].includes(tamper)) return 'Replay / wrong-holder only apply to presentations (VC upload has no holder proof)';
   return undefined;
 }
@@ -154,6 +157,7 @@ export function startRun(input: RunInput): Run {
   const run: Run = {
     id: randomUUID(),
     batchId: input.batchId,
+    retryOf: input.retryOf,
     issuer: input.issuer, wallet: input.wallet, verifier: input.verifier, format: input.format,
     tamper, expired: Boolean(input.expired), txCode: Boolean(input.txCode),
     createdAt: new Date().toISOString(),

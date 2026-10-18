@@ -29,17 +29,27 @@ export function matrixInputs(opts: { scenarios?: string[]; issuers?: string[]; v
 
 export async function runMatrix(inputs: RunInput[], batchId: string, onProgress?: (done: number, total: number, run: Run) => void) {
   const results: Run[] = [];
+  let done = 0;
   for (const input of inputs) {
-    const r = await whenDone(startRun({ ...input, batchId }).id);
+    let r = await whenDone(startRun({ ...input, batchId }).id);
+    // Inji services load JSON-LD contexts over the network on every call, so a transient blip can
+    // fail a run. Retry once; a pass on retry is reported as flaky rather than as a clean result.
+    if (r.result === 'FAIL') r = await whenDone(startRun({ ...input, batchId, retryOf: r.id }).id);
     results.push(r);
-    onProgress?.(results.length, inputs.length, r);
+    onProgress?.(++done, inputs.length, r);
   }
   return results;
 }
 
 const scenarioOf = (r: { tamper: string; expired: boolean }) => (r.tamper !== 'none' ? TAMPER_MODES[r.tamper as Tamper].label : r.expired ? 'Expired credential' : 'Happy path');
 
-export function markdownReport(runs: Array<Pick<Run, 'issuer' | 'wallet' | 'verifier' | 'format' | 'tamper' | 'expired' | 'expected' | 'actual' | 'result' | 'error' | 'proofType' | 'failedStage' | 'createdAt' | 'durationMs'>>, title = 'Inji Interoperability Report') {
+type ReportRun = Pick<Run, 'id' | 'retryOf' | 'issuer' | 'wallet' | 'verifier' | 'format' | 'tamper' | 'expired' | 'expected' | 'actual' | 'result' | 'error' | 'proofType' | 'failedStage' | 'createdAt' | 'durationMs'> & { flaky?: boolean };
+
+export function markdownReport(all: ReportRun[], title = 'Inji Interoperability Report') {
+  // A retried run replaces its first attempt; if the retry passed, the cell is marked flaky.
+  const retried = new Map(all.filter((r) => r.retryOf).map((r) => [r.retryOf!, r]));
+  const runs: ReportRun[] = all.filter((r) => !retried.has(r.id)).map((r) => (r.retryOf && r.result === 'PASS' ? { ...r, flaky: true } : r))
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   const pass = runs.filter((r) => r.result === 'PASS').length;
   const lines: string[] = [];
   lines.push(`# ${title}`, '');
@@ -56,7 +66,7 @@ export function markdownReport(runs: Array<Pick<Run, 'issuer' | 'wallet' | 'veri
     if (!rows.length) continue;
     const cells = verifiers.map((v) => {
       const r = rows.find((x) => x.verifier === v);
-      return r ? (r.result === 'PASS' ? '✅' : `❌ ${r.actual ?? r.failedStage ?? ''}`) : '—';
+      return r ? (r.result === 'PASS' ? (r.flaky ? '✅ (flaky)' : '✅') : `❌ ${r.actual ?? r.failedStage ?? ''}`) : '—';
     });
     lines.push(`| ${party(i)?.name ?? i} | ${FORMATS[f].short} | ${cells.join(' | ')} |`);
   }
@@ -65,7 +75,7 @@ export function markdownReport(runs: Array<Pick<Run, 'issuer' | 'wallet' | 'veri
   lines.push('|---|---|---|---|---|---|---|---|---|---|');
   for (const r of runs) {
     const detail = r.result === 'PASS' ? '' : (r.error ?? '').replace(/\|/g, '\\|').replace(/\n/g, ' ').slice(0, 220);
-    lines.push(`| ${party(r.issuer)?.name ?? r.issuer} | ${party(r.wallet)?.name ?? r.wallet} | ${party(r.verifier)?.name ?? r.verifier} | ${FORMATS[r.format]?.short ?? r.format} | ${r.proofType ?? '—'} | ${scenarioOf(r)} | ${r.expected} | ${r.actual ?? '—'} | ${r.result === 'PASS' ? '✅ PASS' : '❌ FAIL'} | ${detail} |`);
+    lines.push(`| ${party(r.issuer)?.name ?? r.issuer} | ${party(r.wallet)?.name ?? r.wallet} | ${party(r.verifier)?.name ?? r.verifier} | ${FORMATS[r.format]?.short ?? r.format} | ${r.proofType ?? '—'} | ${scenarioOf(r)} | ${r.expected} | ${r.actual ?? '—'} | ${r.result === 'PASS' ? (r.flaky ? '✅ PASS (passed on retry)' : '✅ PASS') : '❌ FAIL'} | ${detail} |`);
   }
   return lines.join('\n') + '\n';
 }

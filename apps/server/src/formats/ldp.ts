@@ -101,7 +101,7 @@ export async function issueLdp(issuer: EdKey, credential: Record<string, unknown
 export async function presentLdp(holder: EdKey, credentials: unknown[], challenge: string, domain: string) {
   const key = await Ed25519VerificationKey2020.from(holder.exported);
   // `now` = issuance time: the holder may still present an expired credential; judging it is the verifier's job.
-  const presentation = vc.createPresentation({ verifiableCredential: credentials, holder: holder.did, now: issuanceInstant(credentials[0]) });
+  const presentation = vc.createPresentation({ verifiableCredential: credentials, holder: holder.did, version: 1.0, now: issuanceInstant(credentials[0]) });
   return vc.signPresentation({ presentation, suite: new Ed25519Signature2020({ key }), challenge, domain, documentLoader });
 }
 
