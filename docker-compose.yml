@@ -1,0 +1,96 @@
+# Inji Interoperability Playground — full local stack.
+#
+#   docker compose up -d --build                 # Inji Certify + Inji Verify (+ Postgres)
+#   docker compose --profile app up -d --build   # …plus the playground itself on :4000
+#
+# Ports: 4000 playground (UI + API + mock issuer/wallet/verifier), 8090 Inji Certify,
+#        8082 Inji Verify service, 5433 Postgres.
+#
+# Config files are baked into small derived images (docker/*/Dockerfile) rather than
+# bind-mounted, so the stack works from any checkout path (bind specs break on paths with ':').
+name: inji-playground
+
+services:
+  database:
+    build: ./docker/postgres
+    image: inji-playground/postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports: ["5433:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d inji_verify"]
+      interval: 5s
+      retries: 30
+
+  certify:
+    build: ./docker/inji-certify
+    image: inji-playground/inji-certify:0.14.0
+    user: root
+    depends_on:
+      database: { condition: service_healthy }
+    environment:
+      - active_profile_env=default,playground
+      - SPRING_CONFIG_NAME=certify
+      - SPRING_CONFIG_LOCATION=/home/mosip/config/
+      - CERTIFY_ISSUER_DID=${CERTIFY_ISSUER_DID:-did:web:localhost%3A8090}
+      - JDK_JAVA_OPTIONS=-Xmx768m
+    volumes:
+      # The 0.14 image writes its PKCS12 keystore under /home/inji (not /home/mosip as the
+      # upstream compose assumes); persist it so DB key rows keep pointing at real keys.
+      - certify-keys:/home/inji/CERTIFY_PKCS12
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8090/v1/certify/actuator/health || exit 1"]
+      interval: 10s
+      retries: 30
+      start_period: 60s
+
+  certify-nginx:
+    build:
+      context: ./docker/inji-certify
+      dockerfile: nginx.Dockerfile
+    image: inji-playground/certify-nginx:1.27
+    depends_on: [certify]
+    ports: ["8090:8090"]
+
+  verify-service:
+    image: mosipid/inji-verify-service:0.16.0
+    user: root
+    depends_on:
+      database: { condition: service_healthy }
+    ports: ["8082:8080"]
+    environment:
+      - active_profile_env=default
+      - DATABASE_HOST=database
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=inji_verify
+      - DATABASE_SCHEMA=verify
+      - DATABASE_USERNAME=postgres
+      - DATABASE_PASSWORD=postgres
+      - INJI_VP_REQUEST_LONG_POLLING_TIMEOUT=20000
+      # response_uri handed to wallets. Use a LAN/ngrok URL when a phone wallet must reach it.
+      - INJI_VP_SUBMISSION_BASE_URL=${VERIFY_PUBLIC_URL:-http://localhost:8082/v1/verify}
+      - INJI_DID_VERIFY_URI=did:web:localhost%3A8082:v1:verify
+      - INJI_DID_VERIFY_PUBLIC_KEY_URI=did:web:localhost%3A8082:v1:verify#key-0
+      - INJI_KEYSTORE_FILE_PASS=mosip
+      - INJI_VERIFY_REDIRECT_URI=
+      - JDK_JAVA_OPTIONS=-Xmx512m
+
+  playground:
+    build: .
+    image: inji-playground/app:latest
+    profiles: ["app"]
+    depends_on: [certify-nginx, verify-service]
+    ports: ["4000:4000"]
+    environment:
+      - INJI_CERTIFY_URL=http://localhost:8090
+      - INJI_VERIFY_URL=http://localhost:8082
+      # Inside this container "localhost:8090/8082" are the Inji services, not this container.
+      - URL_REWRITES=http://localhost:8090=http://certify-nginx:8090,http://localhost:8082=http://verify-service:8080
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:4000}
+    volumes:
+      - playground-data:/app/apps/server/data
+
+volumes:
+  certify-keys:
+  playground-data:
