@@ -70,6 +70,23 @@ export function markdownReport(all: ReportRun[], title = 'Inji Interoperability 
     });
     lines.push(`| ${party(i)?.name ?? i} | ${FORMATS[f].short} | ${cells.join(' | ')} |`);
   }
+  lines.push('', '## Scenario matrix', '');
+  lines.push('Every issuer → verifier pair per scenario. ✅ = verifier reached the expected verdict; ❌ = it did not (the verdict it gave is shown).', '');
+  lines.push(`| Issuer | Format | Verifier | ${SCENARIOS.map((s) => s.label).join(' | ')} |`);
+  lines.push(`|---|---|---|${SCENARIOS.map(() => ':-:').join('|')}|`);
+  const combos = new Map<string, ReportRun[]>();
+  for (const r of runs) {
+    const k = `${r.issuer}|${r.format}|${r.verifier}`;
+    combos.set(k, [...(combos.get(k) ?? []), r]);
+  }
+  for (const [k, rs] of combos) {
+    const [i, f, v] = k.split('|');
+    const cells = SCENARIOS.map((s) => {
+      const r = rs.filter((x) => x.tamper === s.tamper && x.expired === s.expired).pop();
+      return !r ? '—' : r.result === 'PASS' ? '✅' : `❌ ${r.actual ?? 'error'}`;
+    });
+    lines.push(`| ${party(i)?.name ?? i} | ${FORMATS[f as Format]?.short ?? f} | ${party(v)?.name ?? v} | ${cells.join(' | ')} |`);
+  }
   lines.push('', '## All runs', '');
   lines.push('| Issuer | Wallet | Verifier | Format | Proof | Scenario | Expected | Actual | Result | Detail |');
   lines.push('|---|---|---|---|---|---|---|---|---|---|');

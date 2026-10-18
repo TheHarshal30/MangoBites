@@ -45,6 +45,7 @@ export interface Check { name: string; ok: boolean; detail?: string }
 export interface RunSummary {
   id: string;
   batchId?: string;
+  retryOf?: string;
   issuer: string;
   wallet: string;
   verifier: string;
@@ -138,3 +139,11 @@ export function useRuns() {
 
 export const scenarioLabel = (r: Pick<RunSummary, 'tamper' | 'expired'>, cat?: Catalog | null) =>
   r.tamper !== 'none' ? (cat?.tamperModes[r.tamper]?.label ?? r.tamper) : r.expired ? 'Expired credential' : 'Happy path';
+
+/** Drops first attempts that a sweep re-ran (the retry supersedes them). */
+export function withoutSuperseded<T extends { id: string; retryOf?: string }>(runs: T[]): T[] {
+  const superseded = new Set(runs.map((r) => r.retryOf).filter(Boolean));
+  return runs.filter((r) => !superseded.has(r.id));
+}
+
+export const formatDuration = (ms?: number) => (ms == null ? '—' : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);

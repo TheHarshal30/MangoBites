@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { api, scenarioLabel, type Catalog, type RunSummary } from '../api';
+import { api, formatDuration, scenarioLabel, type Catalog, type RunSummary } from '../api';
 
 interface Props { catalog: Catalog; runs: RunSummary[]; onOpenRun: (id: string) => void }
 
@@ -33,7 +33,7 @@ export function HistoryView({ catalog, runs, onOpenRun }: Props) {
         <Stat label="Runs" value={String(done.length)} />
         <Stat label="Pass rate" value={done.length ? `${Math.round((100 * pass) / done.length)}%` : '—'} tone={pass === done.length ? 'good' : 'bad'} />
         <Stat label="Failures" value={String(done.length - pass)} tone={done.length - pass ? 'bad' : 'good'} />
-        <Stat label="Avg duration" value={avgMs ? `${(avgMs / 1000).toFixed(1)} s` : '—'} />
+        <Stat label="Avg duration" value={avgMs ? formatDuration(avgMs) : '—'} />
       </div>
 
       <section className="card p-4">

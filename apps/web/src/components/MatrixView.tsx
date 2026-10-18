@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { api, type Catalog, type Format, type RunSummary } from '../api';
+import { api, withoutSuperseded, type Catalog, type Format, type RunSummary } from '../api';
 
 interface Props { catalog: Catalog; runs: RunSummary[]; onOpenRun: (id: string) => void }
 
@@ -18,9 +18,9 @@ export function MatrixView({ catalog, runs, onOpenRun }: Props) {
 
   const batches = useMemo(() => [...new Set(runs.map((r) => r.batchId).filter(Boolean) as string[])].sort().reverse(), [runs]);
   const scope = useMemo(() => {
-    if (batch === 'all') return runs;
+    if (batch === 'all') return withoutSuperseded(runs);
     const b = batch === 'latest' ? batches[0] : batch;
-    return b ? runs.filter((r) => r.batchId === b) : runs;
+    return withoutSuperseded(b ? runs.filter((r) => r.batchId === b) : runs);
   }, [runs, batch, batches]);
 
   const start = async () => {

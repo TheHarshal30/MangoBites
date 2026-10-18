@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
-import { api, useLive, scenarioLabel, type Catalog, type ProtocolEvent, type Run } from '../api';
+import { api, useLive, scenarioLabel, formatDuration, type Catalog, type ProtocolEvent, type Run } from '../api';
 import { Inspector } from './Inspector';
 import { SequenceDiagram } from './SequenceDiagram';
 import { JsonView } from './JsonView';
@@ -51,7 +51,7 @@ export function RunView({ runId, catalog }: { runId: string; catalog: Catalog })
               <span className="chip bg-slate-100 dark:bg-slate-800">{catalog.formats[run.format]?.label}</span>
               {run.proofType && <span className="chip bg-slate-100 dark:bg-slate-800">proof: {run.proofType}</span>}
               <span className={`chip ${run.tamper !== 'none' ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200' : 'bg-slate-100 dark:bg-slate-800'}`}>scenario: {scenarioLabel(run, catalog)}</span>
-              {run.durationMs != null && <span className="chip bg-slate-100 dark:bg-slate-800">{(run.durationMs / 1000).toFixed(1)} s</span>}
+              {run.durationMs != null && <span className="chip bg-slate-100 dark:bg-slate-800">{formatDuration(run.durationMs)}</span>}
             </div>
           </div>
           <Verdict run={run} />
@@ -165,7 +165,11 @@ function ManualPanel({ run }: { run: Run }) {
         <div className="text-sm text-slate-600 dark:text-slate-300">{i.prompt}</div>
         {waitingIssue && i.txCode && <div className="text-sm">Transaction code (PIN): <b className="font-mono text-lg tracking-widest">{i.txCode}</b></div>}
         <div className="break-all rounded bg-white/70 p-2 font-mono text-[11px] text-slate-500 dark:bg-slate-900">{uri}</div>
-        {waitingIssue && <button className="btn-primary" onClick={() => api.signal(run.id)}>Credential received in the wallet →</button>}
+        <div className="flex flex-wrap gap-2">
+          {/* Same-device flow: on a phone, the custom-scheme link hands the request straight to the wallet app. */}
+          {uri && <a className="btn-ghost" href={uri}>Open in wallet on this device</a>}
+          {waitingIssue && <button className="btn-primary" onClick={() => api.signal(run.id)}>Credential received in the wallet →</button>}
+        </div>
       </div>
     </section>
   );

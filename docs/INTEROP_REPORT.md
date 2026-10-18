@@ -1,6 +1,6 @@
 # Inji Interoperability Report
 
-Generated 2026-10-18T00:42:15.017Z · 65 runs · **59 pass / 6 fail**
+Generated 2026-10-18T00:47:43.346Z · 65 runs · **59 pass / 6 fail**
 
 A run **passes** when the verifier reaches the verdict the scenario calls for: `VALID` for the happy path, `EXPIRED` for an expired credential, `INVALID` for every tamper mode. A verifier that accepts a forged or replayed presentation therefore *fails* that row.
 
@@ -13,6 +13,26 @@ A run **passes** when the verifier reaches the verdict the scenario calls for: `
 | Reference Issuer | JSON-LD | ✅ | ✅ | ✅ |
 | Reference Issuer | SD-JWT | ✅ | ✅ | ✅ |
 | Reference Issuer | mDoc | — | — | ✅ |
+
+## Scenario matrix
+
+Every issuer → verifier pair per scenario. ✅ = verifier reached the expected verdict; ❌ = it did not (the verdict it gave is shown).
+
+| Issuer | Format | Verifier | Happy path | Expired credential | Bad signature | Wrong type | Replay (stale nonce) | Wrong holder |
+|---|---|---|:-:|:-:|:-:|:-:|:-:|:-:|
+| Inji Certify | JSON-LD | Inji Verify · OpenID4VP | ✅ | — | ✅ | ✅ | ❌ VALID | ❌ VALID |
+| Inji Certify | SD-JWT | Inji Verify · OpenID4VP | ✅ | ✅ | ✅ | ✅ | ❌ VALID | ✅ |
+| Inji Certify | JSON-LD | Inji Verify · VC upload | ✅ | — | ✅ | ✅ | — | — |
+| Inji Certify | SD-JWT | Inji Verify · VC upload | ✅ | ✅ | ✅ | ✅ | — | — |
+| Inji Certify | JSON-LD | Reference Verifier | ✅ | — | ✅ | ✅ | ✅ | ✅ |
+| Inji Certify | SD-JWT | Reference Verifier | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reference Issuer | JSON-LD | Inji Verify · OpenID4VP | ✅ | ✅ | ✅ | ✅ | ❌ VALID | ❌ VALID |
+| Reference Issuer | SD-JWT | Inji Verify · OpenID4VP | ✅ | ✅ | ✅ | ✅ | ❌ VALID | ✅ |
+| Reference Issuer | JSON-LD | Inji Verify · VC upload | ✅ | ✅ | ✅ | ✅ | — | — |
+| Reference Issuer | SD-JWT | Inji Verify · VC upload | ✅ | ✅ | ✅ | ✅ | — | — |
+| Reference Issuer | JSON-LD | Reference Verifier | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reference Issuer | SD-JWT | Reference Verifier | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Reference Issuer | mDoc | Reference Verifier | ✅ | ✅ | — | — | ✅ | ✅ |
 
 ## All runs
 

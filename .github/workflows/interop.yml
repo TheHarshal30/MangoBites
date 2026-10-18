@@ -1,0 +1,47 @@
+# Nightly (and on-demand) interoperability sweep: brings up Inji Certify + Inji Verify + the
+# playground with Docker Compose, runs every issuer × verifier × format × scenario, and publishes
+# the compatibility matrix as a job summary and artifact.
+name: interop
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run typecheck -w apps/server
+      - run: npm test
+      - run: npm run build -w apps/web
+
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Bring up the stack (Inji Certify, Inji Verify, Postgres, playground)
+        run: ./scripts/up.sh
+      - name: Interoperability sweep
+        run: npm run interop
+      - name: Publish matrix
+        if: always()
+        run: cat docs/INTEROP_REPORT.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interop-report
+          path: docs/INTEROP_REPORT.md
+      - name: Service logs on failure
+        if: failure()
+        run: docker compose logs --tail 200 certify verify-service playground
