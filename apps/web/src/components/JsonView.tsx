@@ -1,23 +1,55 @@
-import { useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
+import { CopyButton, IconButton, cn } from './ui';
 
-/** Pretty JSON with copy; long base64/JWT strings are folded so payloads stay readable. */
-export function JsonView({ value, compact }: { value: unknown; compact?: boolean }) {
-  const [copied, setCopied] = useState(false);
+const LONG = /"([A-Za-z0-9_\-.~+/=]{160,})"/g;
+const TOKEN = /("(?:\\.|[^"\\])*")(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([{}[\],])/g;
+const MAX_HIGHLIGHT = 150_000;
+
+/** Turns pretty-printed JSON into coloured spans (keys, strings, numbers, literals, punctuation). */
+function highlight(text: string): ReactNode[] {
+  if (text.length > MAX_HIGHLIGHT) return [text];
+  const out: ReactNode[] = [];
+  let last = 0, i = 0;
+  for (const m of text.matchAll(TOKEN)) {
+    const at = m.index!;
+    if (at > last) out.push(text.slice(last, at));
+    const [whole, str, colon, lit, num, pun] = m;
+    if (str !== undefined) {
+      out.push(<span key={i++} className={colon ? 'tok-key' : 'tok-str'}>{str}</span>);
+      if (colon) out.push(<span key={i++} className="tok-pun">{colon}</span>);
+    } else if (lit) out.push(<span key={i++} className="tok-lit">{lit}</span>);
+    else if (num) out.push(<span key={i++} className="tok-num">{num}</span>);
+    else if (pun) out.push(<span key={i++} className="tok-pun">{pun}</span>);
+    else out.push(whole);
+    last = at + whole.length;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+/**
+ * Pretty JSON with syntax colours and copy. Long base64/JWT strings are folded so payloads stay
+ * readable; "Expand" shows them in full. Plain strings render as wrapped monospace text.
+ */
+export function JsonView({ value, compact, className, maxHeight }: { value: unknown; compact?: boolean; className?: string; maxHeight?: string }) {
   const [expand, setExpand] = useState(false);
-  const text = typeof value === 'string' ? value : JSON.stringify(value, null, 2) ?? 'null';
-  const shown = expand ? text : text.replace(/"([A-Za-z0-9_\-.~+/=]{180,})"/g, (_m, s: string) => `"${s.slice(0, 90)}…⟨${s.length} chars⟩"`);
-  const folded = shown !== text;
+  const isString = typeof value === 'string';
+  const text = useMemo(() => (isString ? (value as string) : JSON.stringify(value, null, 2) ?? 'undefined'), [value, isString]);
+  const folded = useMemo(() => (isString ? text : text.replace(LONG, (_m, s: string) => `"${s.slice(0, 64)}…${s.slice(-12)}" ⟨${s.length.toLocaleString()} chars⟩`)), [text, isString]);
+  const canFold = folded !== text;
+  const shown = expand || !canFold ? text : folded;
+  const body = useMemo(() => (isString ? shown : highlight(shown)), [shown, isString]);
+
   return (
-    <div className="group relative">
-      <pre className={`code ${compact ? 'max-h-32' : 'max-h-[420px]'} whitespace-pre-wrap break-all`}>{shown}</pre>
-      <div className="absolute right-2 top-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
-        {folded || expand ? (
-          <button className="rounded bg-slate-700 px-2 py-0.5 text-[11px] text-white" onClick={() => setExpand((e) => !e)}>{expand ? 'fold' : 'unfold'}</button>
-        ) : null}
-        <button className="rounded bg-slate-700 px-2 py-0.5 text-[11px] text-white"
-          onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1200); }}>
-          {copied ? 'copied' : 'copy'}
-        </button>
+    <div className={cn('group relative rounded-lg border border-line bg-[var(--code-bg)]', className)}>
+      <pre className={cn('overflow-auto whitespace-pre-wrap break-all p-3 pr-16 font-mono text-[12px] leading-[1.6] text-[var(--code-fg)]',
+        maxHeight ?? (compact ? 'max-h-36' : 'max-h-[420px]'))}>
+        {body}
+      </pre>
+      <div className="absolute right-1.5 top-1.5 flex gap-0.5 rounded-lg bg-[var(--code-bg)]/90 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+        {canFold && <IconButton size="sm" icon={expand ? ChevronsDownUp : ChevronsUpDown} label={expand ? 'Fold long values' : 'Expand long values'} onClick={() => setExpand((e) => !e)} />}
+        <CopyButton text={text} label={isString ? 'Copy' : 'Copy JSON'} />
       </div>
     </div>
   );

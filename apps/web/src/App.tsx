@@ -1,91 +1,124 @@
-import { useEffect, useState } from 'react';
-import { api, useRuns, type Catalog } from './api';
+import { useEffect } from 'react';
+import { RefreshCw, ServerCrash, WifiOff } from 'lucide-react';
+import { AppProvider, useApp } from './lib/app';
+import { useRoute, type Route } from './lib/router';
+import { ThemeProvider } from './lib/theme';
+import { ErrorBoundary, ToastProvider } from './components/overlays';
+import { Header } from './components/Header';
+import { Button, Card, EmptyState, Skeleton, Spinner } from './components/ui';
 import { Playground } from './components/Playground';
 import { MatrixView } from './components/MatrixView';
 import { HistoryView } from './components/HistoryView';
 import { WalletView } from './components/WalletView';
 
-type Tab = 'playground' | 'matrix' | 'history' | 'wallet';
-
-const TABS: Array<{ id: Tab; label: string }> = [
-  { id: 'playground', label: 'Playground' },
-  { id: 'matrix', label: 'Interop matrix' },
-  { id: 'history', label: 'Run history' },
-  { id: 'wallet', label: 'Wallet' },
-];
-
 export default function App() {
-  const [catalog, setCatalog] = useState<Catalog | null>(null);
-  const [error, setError] = useState<string>();
-  const [tab, setTab] = useState<Tab>(() => (location.hash.slice(1).split('/')[0] as Tab) || 'playground');
-  const [openRunId, setOpenRunId] = useState<string | undefined>(() => location.hash.split('/')[1]);
-  const [runs] = useRuns();
+  return (
+    <ThemeProvider>
+      <ToastProvider>
+        <AppProvider>
+          <Shell />
+        </AppProvider>
+      </ToastProvider>
+    </ThemeProvider>
+  );
+}
 
-  const refresh = () => api.catalog().then((c) => { setCatalog(c); setError(undefined); }).catch((e) => setError(e.message));
-  useEffect(() => { refresh(); const t = setInterval(refresh, 15000); return () => clearInterval(t); }, []);
-  useEffect(() => { location.hash = openRunId && tab === 'playground' ? `${tab}/${openRunId}` : tab; }, [tab, openRunId]);
+const TITLES: Record<Route['view'], string> = { playground: 'Playground', matrix: 'Interop matrix', history: 'Run history', wallet: 'Wallet' };
 
-  const openRun = (id: string) => { setOpenRunId(id); setTab('playground'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-  const toggleTheme = () => {
-    const dark = document.documentElement.classList.toggle('dark');
-    try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch { /* ignore */ }
-  };
+function Shell() {
+  const route = useRoute();
+  const { catalog, catalogError, refreshCatalog } = useApp();
+
+  useEffect(() => {
+    if (!(route.view === 'playground' && route.runId)) document.title = `${TITLES[route.view]} · Inji Interop Playground`;
+  }, [route.view, route.runId]);
 
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
-        <div className="mx-auto flex max-w-[1500px] flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <div className="flex items-center gap-2.5">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand-600 text-sm font-black text-white">IP</div>
-            <div>
-              <div className="text-[15px] font-bold leading-tight">Inji Interop Playground</div>
-              <div className="text-[11px] text-slate-500">issue → hold → present → verify · OpenID4VCI / OpenID4VP</div>
-            </div>
-          </div>
-          <nav className="flex gap-1">
-            {TABS.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === t.id ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'}`}>
-                {t.label}
-              </button>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3">
-            {catalog && <ServiceHealth catalog={catalog} />}
-            <button onClick={toggleTheme} className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800" title="Toggle theme" aria-label="Toggle theme">◐</button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-[1500px] px-4 py-5">
-        {error && <div className="card mb-4 border-red-300 p-4 text-sm text-red-700 dark:text-red-300">Cannot reach the playground API: {error}</div>}
-        {!catalog ? <div className="p-10 text-center text-slate-500">Loading catalog…</div> : (
-          <>
-            {tab === 'playground' && <Playground catalog={catalog} runs={runs} openRunId={openRunId} onOpenRun={setOpenRunId} />}
-            {tab === 'matrix' && <MatrixView catalog={catalog} runs={runs} onOpenRun={openRun} />}
-            {tab === 'history' && <HistoryView catalog={catalog} runs={runs} onOpenRun={openRun} />}
-            {tab === 'wallet' && <WalletView />}
-          </>
+    <div className="flex min-h-screen flex-col">
+      <a href="#main" className="sr-only z-50 rounded-lg bg-surface px-3 py-2 text-sm font-medium shadow-pop focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
+      <Header route={route} />
+      <Banners />
+      <main id="main" className="mx-auto w-full max-w-[1600px] flex-1 px-4 py-5 sm:px-6 sm:py-6">
+        {!catalog ? (
+          catalogError ? (
+            <Card>
+              <EmptyState icon={ServerCrash} title="Can’t reach the playground API"
+                description={<>The UI couldn’t load <code className="font-mono text-xs">/api/catalog</code> ({catalogError}). Make sure the server is running — <code className="font-mono text-xs">./scripts/up.sh</code> starts everything.</>}
+                action={<Button icon={RefreshCw} onClick={() => refreshCatalog()}>Try again</Button>} />
+            </Card>
+          ) : <LoadingSkeleton />
+        ) : (
+          <ErrorBoundary resetKey={`${route.view}/${route.runId ?? ''}`}>
+            {route.view === 'playground' && <Playground runId={route.runId} />}
+            {route.view === 'matrix' && <MatrixView />}
+            {route.view === 'history' && <HistoryView />}
+            {route.view === 'wallet' && <WalletView />}
+          </ErrorBoundary>
         )}
       </main>
+      <Footer />
     </div>
   );
 }
 
-function ServiceHealth({ catalog }: { catalog: Catalog }) {
-  const items = [
-    { id: 'inji-certify', label: 'Certify' },
-    { id: 'inji-verify', label: 'Verify' },
-  ].map((s) => ({ ...s, health: catalog.parties.find((p) => p.id === s.id)?.health }));
+function Banners() {
+  const { catalog, catalogError, connection, refreshCatalog } = useApp();
+  if (!catalog) return null;
+  if (catalogError) {
+    return (
+      <div role="alert" className="border-b border-line bg-danger-soft text-danger-fg">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-2.5 px-4 py-2 text-[13px] sm:px-6">
+          <ServerCrash size={15} aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Lost contact with the playground API — showing the last known state.</span>
+          <Button size="xs" variant="ghost" icon={RefreshCw} onClick={() => refreshCatalog()} className="text-danger-fg">Retry</Button>
+        </div>
+      </div>
+    );
+  }
+  if (connection === 'closed') {
+    return (
+      <div role="status" className="border-b border-line bg-warning-soft text-warning-fg">
+        <div className="mx-auto flex max-w-[1600px] items-center gap-2.5 px-4 py-2 text-[13px] sm:px-6">
+          <WifiOff size={15} aria-hidden />
+          <span className="min-w-0 flex-1 truncate">Live updates paused — reconnecting to the playground server…</span>
+          <Spinner size={14} />
+        </div>
+      </div>
+    );
+  }
+  return null;
+}
+
+function Footer() {
+  const { catalog } = useApp();
+  const v = (id: string) => catalog?.parties.find((p) => p.id === id)?.version;
   return (
-    <div className="flex gap-2">
-      {items.map((s) => (
-        <span key={s.id} title={s.health?.detail}
-          className={`chip ${s.health?.up ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${s.health?.up ? 'bg-emerald-500' : 'bg-red-500'}`} />
-          Inji {s.label}
-        </span>
-      ))}
+    <footer className="border-t border-line">
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-4 text-xs text-fg-subtle sm:px-6">
+        <span>Inji Interop Playground</span>
+        {catalog && <span>Inji Certify {v('inji-certify')} · Inji Verify {v('inji-verify')}</span>}
+        <span className="sm:ml-auto">OpenID4VCI draft 13 · OpenID4VP draft 21 · W3C VC · SD-JWT VC · ISO 18013-5</span>
+      </div>
+    </footer>
+  );
+}
+
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label="Loading">
+      <Card className="p-5">
+        <Skeleton className="h-4 w-40" />
+        <div className="mt-5 grid gap-4 lg:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="space-y-2.5">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-[76px] w-full" />
+              <Skeleton className="h-[76px] w-full" />
+            </div>
+          ))}
+        </div>
+      </Card>
+      <Card className="p-5"><Skeleton className="h-40 w-full" /></Card>
     </div>
   );
 }

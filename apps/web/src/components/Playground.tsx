@@ -1,185 +1,310 @@
-import { useEffect, useMemo, useState } from 'react';
-import { api, type Catalog, type Format, type Party, type RunSummary, type Tamper } from '../api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronRight, ChevronUp, Info, KeyRound, Play, RotateCcw, Settings2, Smartphone, TriangleAlert } from 'lucide-react';
+import { api, type Format, type Party } from '../api';
+import { useApp, useCatalog, usePartyLookup } from '../lib/app';
+import {
+  SCENARIOS, SCENARIO_IDS, flowProblem, formatBlocker, fromRun, normalize, sameFlow, scenarioBlocker, setFlowConfig, toRunInput, useFlowConfig,
+  type FlowConfig, type ScenarioId,
+} from '../lib/flow';
+import { formatDuration, relativeTime, useNow } from '../lib/format';
+import { openRun, routeHref, runHref } from '../lib/router';
+import { useToast } from './overlays';
+import { Alert, Badge, Button, Card, CardHeader, EmptyState, Kbd, PageHeader, SectionLabel, SegmentedControl, Switch, cn } from './ui';
+import { FlowLabel, FormatBadge, ResultBadge, ScenarioBadge, VendorBadge, VerdictBadge, scenarioTone, versionLabel } from './domain';
 import { RunView } from './RunView';
 
-interface Props {
-  catalog: Catalog;
-  runs: RunSummary[];
-  openRunId?: string;
-  onOpenRun: (id: string | undefined) => void;
-}
+const ROLES = [
+  { role: 'issuer', step: 1, title: 'Issuer', hint: 'Issues the credential over OpenID4VCI' },
+  { role: 'wallet', step: 2, title: 'Wallet', hint: 'Holds it and presents it' },
+  { role: 'verifier', step: 3, title: 'Verifier', hint: 'Checks the presentation over OpenID4VP' },
+] as const;
 
-const ROLE_TITLES = { issuer: '① Issuer', wallet: '② Wallet (holder)', verifier: '③ Verifier' } as const;
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
 
-export function Playground({ catalog, runs, openRunId, onOpenRun }: Props) {
-  const byRole = (role: Party['role']) => catalog.parties.filter((p) => p.role === role);
-  const [sel, setSel] = useState({ issuer: 'inji-certify', wallet: 'playground-wallet', verifier: 'inji-verify' });
-  const [format, setFormat] = useState<Format>('ldp_vc');
-  const [tamper, setTamper] = useState<Tamper>('none');
-  const [expired, setExpired] = useState(false);
-  const [txCode, setTxCode] = useState(false);
+export function Playground({ runId }: { runId?: string }) {
+  const catalog = useCatalog();
+  const { runs } = useApp();
+  const stored = useFlowConfig();
+  const config = useMemo(() => normalize(stored, catalog), [stored, catalog]);
+  const [editing, setEditing] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [error, setError] = useState<string>();
+  const toast = useToast();
 
-  const parties = {
-    issuer: catalog.parties.find((p) => p.id === sel.issuer)!,
-    wallet: catalog.parties.find((p) => p.id === sel.wallet)!,
-    verifier: catalog.parties.find((p) => p.id === sel.verifier)!,
-  };
-  const formatOk = (f: Format) => Object.values(parties).every((p) => p.formats.includes(f));
-  const manual = parties.wallet.mode === 'manual';
+  const update = (patch: Partial<FlowConfig>) => setFlowConfig(normalize({ ...config, ...patch }, catalog));
 
-  // Keep the selection valid as parties change.
+  // Opening a run loads its configuration, so "Run again" repeats exactly that flow.
+  const synced = useRef<string>();
+  const openSummary = runId ? runs.find((r) => r.id === runId) : undefined;
   useEffect(() => {
-    if (!formatOk(format)) {
-      const f = (Object.keys(catalog.formats) as Format[]).find(formatOk);
-      if (f) setFormat(f);
-    }
-  }, [sel]);
-  useEffect(() => {
-    if (tamper !== 'none' && (manual || !catalog.tamperModes[tamper].formats.includes(format))) setTamper('none');
-    if (expired && !parties.issuer.expiredIssuance?.includes(format)) setExpired(false);
-  }, [sel, format]);
+    if (!openSummary || synced.current === openSummary.id) return;
+    synced.current = openSummary.id;
+    setFlowConfig(normalize(fromRun(openSummary), catalog));
+  }, [openSummary, catalog]);
+  useEffect(() => { if (!runId) setEditing(false); }, [runId]);
 
-  const problem = useMemo(() => {
-    if (!formatOk(format)) return `No common format — ${Object.values(parties).filter((p) => !p.formats.includes(format)).map((p) => p.name).join(', ')} can't do ${catalog.formats[format].short}`;
-    const down = Object.values(parties).find((p) => p.health && !p.health.up);
-    if (down) return `${down.name} is not reachable: ${down.health!.detail}`;
-    if (sel.verifier === 'inji-verify-direct' && ['replay', 'wrong-holder'].includes(tamper)) return 'Replay / wrong-holder need a presentation; VC upload has no holder proof';
-    return undefined;
-  }, [sel, format, tamper, catalog]);
-
-  const expected = tamper !== 'none' ? 'INVALID' : expired ? 'EXPIRED' : 'VALID';
-
-  const start = async () => {
+  const problem = flowProblem(config, catalog);
+  const start = useCallback(async () => {
+    if (problem || starting) return;
     setStarting(true);
-    setError(undefined);
     try {
-      const run = await api.startRun({ ...sel, format, tamper, expired, txCode });
-      onOpenRun(run.id);
-    } catch (e: any) {
-      setError(e.message);
+      const run = await api.startRun(toRunInput(config));
+      synced.current = run.id;
+      setEditing(false);
+      openRun(run.id);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) {
+      toast({ tone: 'danger', title: 'Couldn’t start the run', description: (e as Error).message });
     } finally {
       setStarting(false);
     }
-  };
+  }, [config, problem, starting, toast]);
 
-  const recent = runs.slice(0, 8);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); start(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [start]);
+
+  const sameAsOpen = !!openSummary && sameFlow(config, fromRun(openSummary));
+
+  if (!runId) {
+    return (
+      <div className="space-y-5">
+        <PageHeader title="Playground"
+          description="Run the full issue → hold → present → verify cycle between any issuer, wallet and verifier, and inspect every OpenID4VCI and OpenID4VP message as it happens." />
+        <Configurator config={config} update={update} problem={problem} starting={starting} onStart={start} />
+        <RecentRuns />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
-      <section className="card p-4">
-        <div className="grid gap-4 lg:grid-cols-3">
-          {(['issuer', 'wallet', 'verifier'] as const).map((role) => (
-            <div key={role}>
-              <div className="label mb-2 flex items-center gap-2">{ROLE_TITLES[role]}</div>
-              <div className="space-y-2">
-                {byRole(role).map((p) => (
-                  <PartyCard key={p.id} party={p} selected={sel[role] === p.id} onSelect={() => setSel((s) => ({ ...s, [role]: p.id }))} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-4 border-t border-slate-200 pt-4 lg:grid-cols-[1fr_1.4fr_auto] dark:border-slate-800">
-          <div>
-            <div className="label mb-2">Credential format</div>
-            <div className="flex flex-wrap gap-2">
-              {(Object.entries(catalog.formats) as Array<[Format, { label: string; short: string }]>).map(([f, meta]) => (
-                <button key={f} disabled={!formatOk(f)} onClick={() => setFormat(f)} title={formatOk(f) ? meta.label : 'Not supported by every selected party'}
-                  className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-35 ${format === f ? 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-700/20 dark:text-brand-100' : 'border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}`}>
-                  {meta.short}
-                </button>
-              ))}
-            </div>
-            <div className="mt-1.5 text-xs text-slate-500">{catalog.formats[format].label}</div>
-            <label className="mt-3 flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={txCode} onChange={(e) => setTxCode(e.target.checked)} />
-              Require transaction code (PIN) on the offer
-            </label>
-          </div>
-
-          <div>
-            <div className="label mb-2">Scenario · replay &amp; tamper</div>
-            <div className="flex flex-wrap gap-2">
-              <ScenarioButton active={tamper === 'none' && !expired} onClick={() => { setTamper('none'); setExpired(false); }} label="Happy path" hint="Honest issue and presentation" />
-              <ScenarioButton active={expired} disabled={!parties.issuer.expiredIssuance?.includes(format)} onClick={() => { setTamper('none'); setExpired(true); }}
-                label="Expired credential" hint={parties.issuer.expiredIssuance?.includes(format) ? 'Issuer signs a credential whose validity already ended' : `${parties.issuer.name} can't issue expired ${catalog.formats[format].short}`} />
-              {(Object.entries(catalog.tamperModes) as Array<[Tamper, any]>).filter(([t]) => t !== 'none').map(([t, m]) => (
-                <ScenarioButton key={t} active={tamper === t} disabled={manual || !m.formats.includes(format)} onClick={() => { setTamper(t); setExpired(false); }}
-                  label={m.label} hint={manual ? 'Tamper modes need the Reference Wallet' : m.formats.includes(format) ? m.description : `Not available for ${catalog.formats[format].short}`} tamper />
-              ))}
-            </div>
-            <div className="mt-1.5 text-xs text-slate-500">
-              Expected verifier verdict: <b className={expected === 'VALID' ? 'text-emerald-600' : expected === 'EXPIRED' ? 'text-amber-600' : 'text-red-600'}>{expected}</b>
-              {tamper !== 'none' && <> — the run passes only if the verifier <i>rejects</i> the presentation.</>}
-            </div>
-          </div>
-
-          <div className="flex flex-col justify-end gap-2">
-            <button className="btn-primary h-11 min-w-44 text-base" disabled={!!problem || starting} onClick={start}>
-              {starting ? 'Starting…' : '▶ Run flow'}
-            </button>
-            {(problem || error) && <div className="max-w-64 text-xs text-red-600 dark:text-red-400">{error ?? problem}</div>}
-          </div>
-        </div>
-      </section>
-
-      {recent.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="label">Recent</span>
-          {recent.map((r) => (
-            <button key={r.id} onClick={() => onOpenRun(r.id)}
-              className={`chip border ${openRunId === r.id ? 'border-slate-900 dark:border-white' : 'border-transparent'} ${r.state === 'running' ? 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-200' : r.result === 'PASS' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200'}`}>
-              {r.state === 'running' ? '◌' : r.result === 'PASS' ? '✓' : '✗'} {catalog.formats[r.format]?.short} · {name(catalog, r.issuer)} → {name(catalog, r.verifier)}
-            </button>
-          ))}
-        </div>
+      {editing ? (
+        <Configurator config={config} update={update} problem={problem} starting={starting} onStart={start} onCollapse={() => setEditing(false)} />
+      ) : (
+        <FlowBar config={config} problem={problem} starting={starting} onStart={start} onEdit={() => setEditing(true)} again={sameAsOpen} />
       )}
-
-      {openRunId ? <RunView key={openRunId} runId={openRunId} catalog={catalog} /> : (
-        <div className="card grid place-items-center p-12 text-center text-sm text-slate-500">
-          <div className="max-w-lg">
-            <div className="mb-2 text-base font-semibold text-slate-700 dark:text-slate-200">Pick an issuer, a wallet and a verifier, then run the flow.</div>
-            Every OpenID4VCI and OpenID4VP exchange shows up live in the protocol inspector below, with JWTs, SD-JWT disclosures and credentials decoded.
-          </div>
-        </div>
-      )}
+      <RunView key={runId} runId={runId} />
     </div>
   );
 }
 
-const name = (c: Catalog, id: string) => c.parties.find((p) => p.id === id)?.name ?? id;
+// ── Configurator ─────────────────────────────────────────────────────────────
 
-function PartyCard({ party, selected, onSelect }: { party: Party; selected: boolean; onSelect: () => void }) {
-  const inji = party.vendor === 'Inji';
+function Configurator({ config, update, problem, starting, onStart, onCollapse }: {
+  config: FlowConfig; update: (p: Partial<FlowConfig>) => void; problem?: string; starting: boolean; onStart: () => void; onCollapse?: () => void;
+}) {
+  const catalog = useCatalog();
+  const formats = Object.keys(catalog.formats) as Format[];
+  const wallet = catalog.parties.find((p) => p.id === config.wallet);
+  const s = SCENARIOS[config.scenario];
+  const blockedFormats = formats.map((f) => [f, formatBlocker(config, catalog, f)] as const).filter(([, b]) => b);
+
   return (
-    <button onClick={onSelect} aria-pressed={selected}
-      className={`w-full rounded-lg border p-3 text-left transition ${selected ? 'border-brand-600 bg-brand-50/60 ring-1 ring-brand-600 dark:bg-brand-700/10' : 'border-slate-200 hover:border-slate-400 dark:border-slate-800 dark:hover:border-slate-600'}`}>
-      <div className="flex items-start gap-2">
-        <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${party.health?.up === false ? 'bg-red-500' : 'bg-emerald-500'}`} title={party.health?.detail} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="font-semibold">{party.name}</span>
-            <span className={`chip ${inji ? 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200' : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200'}`}>{inji ? 'Inji' : 'non-Inji'}</span>
-            <span className="chip bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">v{party.version}</span>
-            {party.mode === 'manual' && <span className="chip bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200">manual · QR</span>}
+    <Card className="overflow-hidden">
+      {onCollapse && (
+        <CardHeader icon={Settings2} title="Configure the next run" description="Changes apply to the next run; the run below stays as it was."
+          actions={<Button size="sm" variant="ghost" icon={ChevronUp} onClick={onCollapse}>Collapse</Button>} />
+      )}
+
+      <div className="grid gap-px bg-line lg:grid-cols-3">
+        {ROLES.map(({ role, step, title, hint }) => (
+          <div key={role} className="bg-surface p-4 sm:p-5">
+            <div className="mb-3 flex items-center gap-2.5" id={`role-${role}`}>
+              <span className="grid h-5 w-5 place-items-center rounded-full bg-sunken text-[11px] font-semibold text-fg-muted ring-1 ring-inset ring-line">{step}</span>
+              <span className="text-[13px] font-semibold text-fg">{title}</span>
+              <span className="truncate text-xs text-fg-subtle">{hint}</span>
+            </div>
+            <div role="radiogroup" aria-labelledby={`role-${role}`} className="space-y-2">
+              {catalog.parties.filter((p) => p.role === role).map((p) => (
+                <PartyOption key={p.id} party={p} selected={config[role] === p.id} onSelect={() => update({ [role]: p.id })} />
+              ))}
+            </div>
           </div>
-          <div className="mt-0.5 text-xs text-slate-500">{party.protocol}</div>
-          {selected && <div className="mt-1.5 text-xs text-slate-600 dark:text-slate-400">{party.description}</div>}
-          {selected && party.health && !party.health.up && <div className="mt-1 text-xs text-red-600">{party.health.detail}</div>}
+        ))}
+      </div>
+
+      <div className="grid gap-px border-t border-line bg-line lg:grid-cols-[minmax(0,1fr)_minmax(0,2fr)] xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(270px,0.9fr)]">
+        <div className="bg-surface p-4 sm:p-5">
+          <SectionLabel>Credential format</SectionLabel>
+          <SegmentedControl label="Credential format" fullWidth size="md" value={config.format} onChange={(f) => update({ format: f })}
+            options={formats.map((f) => ({ value: f, label: catalog.formats[f].short, disabled: !!formatBlocker(config, catalog, f), title: formatBlocker(config, catalog, f) ?? catalog.formats[f].label }))} />
+          <p className="mt-2 text-xs text-fg-muted">{catalog.formats[config.format].label}</p>
+          {blockedFormats.length > 0 && (
+            <ul className="mt-2 space-y-1">
+              {blockedFormats.map(([f, b]) => (
+                <li key={f} className="flex items-start gap-1.5 text-xs text-fg-subtle">
+                  <Info size={12} className="mt-0.5 shrink-0" aria-hidden />
+                  <span><span className="font-medium text-fg-muted">{catalog.formats[f].short}</span> — {b!.replace(/^Not supported by/, 'not supported by')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-6">
+            <SectionLabel>Options</SectionLabel>
+            <Switch checked={config.txCode} onChange={(v) => update({ txCode: v })} label="Require a transaction code"
+              description="The credential offer asks the wallet for a one-time PIN" />
+          </div>
+        </div>
+
+        <div className="bg-surface p-4 sm:p-5">
+          <SectionLabel action={<span className="text-xs text-fg-subtle">Negative scenarios tamper with the issuance or presentation</span>}>Scenario</SectionLabel>
+          <div role="radiogroup" aria-label="Scenario" className="grid gap-2 sm:grid-cols-2 2xl:grid-cols-3">
+            {SCENARIO_IDS.map((id) => (
+              <ScenarioOption key={id} id={id} selected={config.scenario === id} blocker={scenarioBlocker(config, catalog, id)} onSelect={() => update({ scenario: id })} />
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col bg-sunken/60 p-4 sm:p-5 lg:col-span-2 xl:col-span-1">
+          <SectionLabel>Expected verdict</SectionLabel>
+          <div className="flex items-center gap-2.5">
+            <VerdictBadge verdict={s.expected} size="md" />
+            <span className="text-sm font-medium text-fg">{s.label}</span>
+          </div>
+          <p className="mt-2 text-xs leading-relaxed text-fg-subtle">
+            {s.negative
+              ? <>The run passes only if the verifier returns <b className="font-semibold text-fg-muted">{s.expected}</b>. Accepting this presentation is an interop finding.</>
+              : <>The run passes if the verifier accepts the honest presentation and returns <b className="font-semibold text-fg-muted">VALID</b>.</>}
+          </p>
+          {wallet?.mode === 'manual' && (
+            <Alert tone="info" icon={Smartphone} className="mt-3 text-xs">
+              You’ll scan QR codes with the Inji Wallet app. {wallet.health?.detail && <span className="opacity-90">Note: {wallet.health.detail}.</span>}
+            </Alert>
+          )}
+          <div className="mt-auto pt-5">
+            {problem && <Alert tone="warning" icon={TriangleAlert} className="mb-3 text-xs">{problem}</Alert>}
+            <Button variant="primary" size="lg" className="w-full" icon={Play} loading={starting} disabled={!!problem} onClick={onStart}>
+              {starting ? 'Starting…' : 'Run flow'}
+            </Button>
+            <div className="mt-2 hidden items-center justify-center gap-1 text-[11px] text-fg-subtle sm:flex">
+              or press <Kbd>{IS_MAC ? '⌘' : 'Ctrl'}</Kbd><Kbd>↵</Kbd>
+            </div>
+          </div>
         </div>
       </div>
+    </Card>
+  );
+}
+
+function PartyOption({ party, selected, onSelect }: { party: Party; selected: boolean; onSelect: () => void }) {
+  const down = party.health && !party.health.up;
+  const version = versionLabel(party);
+  return (
+    <button type="button" role="radio" aria-checked={selected} onClick={onSelect}
+      className={cn('group relative flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-colors',
+        selected ? 'border-brand bg-brand-soft/50 ring-1 ring-inset ring-brand' : 'border-line hover:border-line-strong hover:bg-hover/50')}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-sm font-semibold text-fg">{party.name}</span>
+          <VendorBadge party={party} />
+          {version && <span className="text-xs text-fg-subtle">{version}</span>}
+          {party.mode === 'manual' && <Badge tone="warning" size="xs" icon={Smartphone}>Manual · QR</Badge>}
+          {down && <Badge tone="danger" size="xs" dot>Unreachable</Badge>}
+        </div>
+        <div className="mt-0.5 text-xs text-fg-muted">{party.protocol}</div>
+        <div className="mt-1.5 line-clamp-2 text-xs leading-relaxed text-fg-subtle" title={party.description}>{down ? party.health!.detail : party.description}</div>
+      </div>
+      <span aria-hidden className={cn('mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border transition-colors',
+        selected ? 'border-brand bg-brand text-brand-contrast' : 'border-line-strong bg-surface group-hover:border-fg-subtle')}>
+        {selected && <Check size={10} strokeWidth={3.5} />}
+      </span>
     </button>
   );
 }
 
-function ScenarioButton({ active, disabled, onClick, label, hint, tamper }: { active: boolean; disabled?: boolean; onClick: () => void; label: string; hint: string; tamper?: boolean }) {
+function ScenarioOption({ id, selected, blocker, onSelect }: { id: ScenarioId; selected: boolean; blocker?: string; onSelect: () => void }) {
+  const s = SCENARIOS[id];
+  const tone = scenarioTone(id);
   return (
-    <button disabled={disabled} onClick={onClick} title={hint}
-      className={`rounded-lg border px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-35 ${active ? (tamper ? 'border-red-600 bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-200' : 'border-brand-600 bg-brand-50 text-brand-700 dark:bg-brand-700/20 dark:text-brand-100') : 'border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800'}`}>
-      {tamper && '⚠ '}{label}
+    <button type="button" role="radio" aria-checked={selected} disabled={!!blocker} onClick={onSelect} title={blocker}
+      className={cn('flex h-full flex-col rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed',
+        selected ? 'border-brand bg-brand-soft/50 ring-1 ring-inset ring-brand' : 'border-line enabled:hover:border-line-strong enabled:hover:bg-hover/50',
+        blocker && 'bg-sunken/40')}>
+      <div className="flex w-full items-center gap-2">
+        <s.icon size={15} aria-hidden className={cn('shrink-0', blocker ? 'text-fg-subtle' : tone === 'neutral' ? 'text-success' : 'text-violet')} />
+        <span className={cn('truncate text-[13px] font-semibold', blocker ? 'text-fg-subtle' : 'text-fg')}>{s.label}</span>
+        <span className={cn('ml-auto', blocker && 'opacity-50')}><VerdictBadge verdict={s.expected} size="xs" /></span>
+      </div>
+      <div className={cn('mt-1 line-clamp-2 text-xs leading-relaxed', blocker ? 'text-fg-subtle italic' : 'text-fg-subtle')}>{blocker ?? s.description}</div>
     </button>
+  );
+}
+
+// ── Collapsed configuration bar (shown above an open run) ────────────────────
+
+function FlowBar({ config, problem, starting, onStart, onEdit, again }: {
+  config: FlowConfig; problem?: string; starting: boolean; onStart: () => void; onEdit: () => void; again: boolean;
+}) {
+  const catalog = useCatalog();
+  const { name } = usePartyLookup();
+  return (
+    <Card className="flex flex-col gap-x-4 gap-y-2.5 px-4 py-2.5 md:flex-row md:items-center">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="eyebrow">{again ? 'This flow' : 'Next run'}</span>
+        <FlowLabel run={config} name={name} className="max-w-full text-[13px] font-medium text-fg" />
+        <span className="flex flex-wrap items-center gap-1.5">
+          <FormatBadge format={config.format} catalog={catalog} />
+          <ScenarioBadge scenario={config.scenario} />
+          {config.txCode && <Badge tone="neutral" icon={KeyRound}>PIN</Badge>}
+        </span>
+      </div>
+      <div className="flex items-center gap-2">
+        {problem && <span className="hidden max-w-64 truncate text-xs text-warning-fg lg:inline" title={problem}>{problem}</span>}
+        <Button size="sm" variant="secondary" icon={Settings2} onClick={onEdit}>Configure</Button>
+        <Button size="sm" variant="primary" icon={again ? RotateCcw : Play} loading={starting} disabled={!!problem} onClick={onStart}
+          title={`${again ? 'Run this flow again' : 'Run the configured flow'} (${IS_MAC ? '⌘' : 'Ctrl'}+Enter)`}>
+          {again ? 'Run again' : 'Run'}
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// ── Recent runs (empty-state companion of the configurator) ──────────────────
+
+function RecentRuns() {
+  const catalog = useCatalog();
+  const { runs, runsLoaded } = useApp();
+  const { name } = usePartyLookup();
+  const now = useNow();
+  const recent = runs.slice(0, 6);
+  if (!runsLoaded) return null;
+
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader title="Recent runs" description={runs.length ? `${runs.length.toLocaleString()} runs recorded` : undefined}
+        actions={runs.length > 0 && <a href={routeHref({ view: 'history' })} className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-fg-muted hover:bg-hover hover:text-fg">View all <ChevronRight size={14} aria-hidden /></a>} />
+      {recent.length === 0 ? (
+        <EmptyState icon={Play} title="No runs yet" description="Configure a flow above and press Run flow. Every protocol message streams into the inspector as it happens." />
+      ) : (
+        <ul className="divide-y divide-line">
+          {recent.map((r) => (
+            <li key={r.id}>
+              <a href={runHref(r.id)} className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-2.5 transition-colors hover:bg-hover/50 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto_auto_auto]">
+                <span className="w-[4.5rem]"><ResultBadge run={r} /></span>
+                <span className="min-w-0">
+                  <FlowLabel run={r} name={name} className="hidden text-[13px] font-medium text-fg sm:flex" />
+                  <FlowLabel run={r} name={name} showWallet={false} className="text-[13px] font-medium text-fg sm:hidden" />
+                  {r.result === 'FAIL' && r.error && <span className="mt-0.5 block truncate text-xs text-danger-fg">{r.error}</span>}
+                </span>
+                <span className="hidden items-center gap-1.5 sm:flex">
+                  <FormatBadge format={r.format} catalog={catalog} />
+                  <ScenarioBadge run={r} />
+                </span>
+                <span className="hidden w-14 text-right text-xs tabular-nums text-fg-subtle sm:block">{formatDuration(r.durationMs)}</span>
+                <span className="flex items-center gap-1 text-right text-xs text-fg-subtle">
+                  <span className="whitespace-nowrap">{relativeTime(r.createdAt, now)}</span>
+                  <ChevronRight size={14} aria-hidden className="text-fg-subtle/60 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }

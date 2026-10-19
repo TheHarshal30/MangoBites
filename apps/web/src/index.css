@@ -2,53 +2,247 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-@theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-  --color-brand-50: #fff7ed;
-  --color-brand-100: #ffedd5;
-  --color-brand-500: #f97316;
-  --color-brand-600: #ea580c;
-  --color-brand-700: #c2410c;
+/*
+ * Semantic tokens. Components use these (bg-surface, text-fg-muted, border-line, …) instead of
+ * raw palette colours, so light/dark is decided here once and never with `dark:` in a view.
+ */
+:root {
+  color-scheme: light;
+  --canvas: #f6f7f9;
+  --surface: #ffffff;
+  --sunken: #f3f4f6;
+  --hover: #eceef1;
+  --line: #e4e7eb;
+  --line-strong: #d0d5dc;
+  --fg: #111827;
+  --fg-muted: #4b5563;
+  --fg-subtle: #6b7280;
+
+  --brand: #ea580c;
+  --brand-hover: #c2410c;
+  --brand-contrast: #ffffff;
+  --brand-soft: #fff4ec;
+  --brand-soft-fg: #c2410c;
+  --ring: rgb(234 88 12 / 0.55);
+
+  --success: #059669;
+  --success-soft: #ecfdf5;
+  --success-fg: #047857;
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --danger-fg: #b91c1c;
+  --warning: #d97706;
+  --warning-soft: #fffbeb;
+  --warning-fg: #b45309;
+  --info: #0284c7;
+  --info-soft: #f0f9ff;
+  --info-fg: #0369a1;
+  --violet: #7c3aed;
+  --violet-soft: #f5f3ff;
+  --violet-fg: #6d28d9;
+
+  --role-issuer: #7c3aed;
+  --role-wallet: #2563eb;
+  --role-verifier: #0d9488;
+  --role-playground: #6b7280;
+
+  --code-bg: #f8f9fb;
+  --code-fg: #1f2937;
+  --code-key: #1d4ed8;
+  --code-string: #047857;
+  --code-number: #b45309;
+  --code-literal: #7c3aed;
+  --code-punct: #9ca3af;
+
+  --shadow-card: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.03);
+  --shadow-pop: 0 10px 30px -8px rgb(16 24 40 / 0.18), 0 2px 6px rgb(16 24 40 / 0.06);
 }
 
-:root {
-  color-scheme: light dark;
+.dark {
+  color-scheme: dark;
+  --canvas: #0a0b0d;
+  --surface: #111316;
+  --sunken: #16191d;
+  --hover: #1d2127;
+  --line: #24282f;
+  --line-strong: #343a43;
+  --fg: #e8eaed;
+  --fg-muted: #a7adb7;
+  --fg-subtle: #80878f;
+
+  --brand: #f97316;
+  --brand-hover: #fb8a3c;
+  --brand-contrast: #ffffff;
+  --brand-soft: rgb(249 115 22 / 0.12);
+  --brand-soft-fg: #fdba74;
+  --ring: rgb(251 146 60 / 0.6);
+
+  --success: #10b981;
+  --success-soft: rgb(16 185 129 / 0.12);
+  --success-fg: #6ee7b7;
+  --danger: #ef4444;
+  --danger-soft: rgb(239 68 68 / 0.13);
+  --danger-fg: #fca5a5;
+  --warning: #f59e0b;
+  --warning-soft: rgb(245 158 11 / 0.12);
+  --warning-fg: #fcd34d;
+  --info: #38bdf8;
+  --info-soft: rgb(14 165 233 / 0.12);
+  --info-fg: #7dd3fc;
+  --violet: #a78bfa;
+  --violet-soft: rgb(139 92 246 / 0.14);
+  --violet-fg: #c4b5fd;
+
+  --role-issuer: #a78bfa;
+  --role-wallet: #60a5fa;
+  --role-verifier: #2dd4bf;
+  --role-playground: #9ca3af;
+
+  --code-bg: #0c0e11;
+  --code-fg: #d1d5db;
+  --code-key: #93c5fd;
+  --code-string: #86efac;
+  --code-number: #fcd34d;
+  --code-literal: #c4b5fd;
+  --code-punct: #6b7280;
+
+  --shadow-card: 0 0 0 0 transparent;
+  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6), 0 0 0 1px rgb(255 255 255 / 0.04);
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-contrast: var(--brand-contrast);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-fg: var(--brand-soft-fg);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-fg: var(--success-fg);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-fg: var(--danger-fg);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-fg: var(--warning-fg);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-fg: var(--info-fg);
+  --color-violet: var(--violet);
+  --color-violet-soft: var(--violet-soft);
+  --color-violet-fg: var(--violet-fg);
+
+  --color-role-issuer: var(--role-issuer);
+  --color-role-wallet: var(--role-wallet);
+  --color-role-verifier: var(--role-verifier);
+  --color-role-playground: var(--role-playground);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --animate-fade-in: fade-in 0.18s ease-out;
+  --animate-pop-in: pop-in 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  --animate-slide-in-right: slide-in-right 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-row-in: row-in 1.2s ease-out;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes row-in {
+  from { background-color: var(--brand-soft); }
+  to { background-color: transparent; }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-canvas font-sans text-fg antialiased;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--fg);
+}
+
+/* One focus treatment for everything that can be focused by keyboard. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
 }
 
 @utility card {
-  @apply rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900;
+  @apply rounded-xl border border-line bg-surface shadow-card;
 }
 
-@utility chip {
-  @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+@utility eyebrow {
+  @apply text-[11px] font-semibold uppercase tracking-[0.06em] text-fg-subtle;
 }
 
-@utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
-}
+/* JSON syntax colours (JsonView). */
+.tok-key { color: var(--code-key); }
+.tok-str { color: var(--code-string); }
+.tok-num { color: var(--code-number); }
+.tok-lit { color: var(--code-literal); }
+.tok-pun { color: var(--code-punct); }
 
-@utility btn-primary {
-  @apply btn bg-brand-600 text-white hover:bg-brand-700;
-}
-
-@utility btn-ghost {
-  @apply btn border border-slate-300 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
-}
-
-@utility label {
-  @apply text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400;
-}
-
-pre.code {
-  @apply overflow-auto rounded-lg bg-slate-950 p-3 font-mono text-[12px] leading-relaxed text-slate-100;
-}
-
+/* Mermaid sequence diagram: messages are clickable and map to inspector events. */
 .mermaid-host svg {
   max-width: 100% !important;
   height: auto;
+}
+.mermaid-host .is-clickable {
+  cursor: pointer;
+}
+.mermaid-host text.is-clickable:hover,
+.mermaid-host text.is-selected {
+  fill: var(--brand) !important;
+}
+.mermaid-host text.is-selected {
+  font-weight: 600;
+}
+.mermaid-host .messageLine0.is-selected,
+.mermaid-host .messageLine1.is-selected {
+  stroke: var(--brand) !important;
+  stroke-width: 2px !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

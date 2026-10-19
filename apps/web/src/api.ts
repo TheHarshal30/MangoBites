@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type Format = 'ldp_vc' | 'vc+sd-jwt' | 'mso_mdoc';
 export type Tamper = 'none' | 'bad-signature' | 'wrong-type' | 'replay' | 'wrong-holder';
@@ -65,9 +65,33 @@ export interface RunSummary {
   result?: 'PASS' | 'FAIL';
   error?: string;
   failedStage?: string;
-  credential?: { format: Format; summary: Record<string, unknown> };
+  credential?: { format: Format; summary: CredentialSummary };
   interaction?: { offerUri?: string; txCode?: string; authorizationRequestUri?: string; prompt?: string };
   outcomeChecks?: Check[];
+  eventCount?: number;
+}
+
+export interface WalletCredential {
+  id: string;
+  format: Format;
+  configId?: string;
+  issuer: string;
+  receivedAt: string;
+  credential: unknown;
+  summary?: CredentialSummary;
+}
+
+/** Display summary the server derives from a credential (shape varies a little by format). */
+export interface CredentialSummary {
+  type?: string | string[];
+  vct?: string;
+  docType?: string;
+  issuer?: string;
+  expires?: string;
+  alg?: string;
+  subject?: Record<string, unknown>;
+  claims?: Record<string, unknown>;
+  [k: string]: unknown;
 }
 
 export interface Run extends RunSummary {
@@ -91,39 +115,89 @@ export const api = {
   startMatrix: (body: Record<string, unknown>) =>
     fetch('/api/matrix', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<{ batchId: string; total: number; done: number }>(r)),
   matrix: () => fetch('/api/matrix').then((r) => json<{ batchId: string; total: number; done: number } | null>(r)),
-  clearRuns: () => fetch('/api/runs', { method: 'DELETE' }),
-  wallet: () => fetch('/api/wallet').then((r) => json<any[]>(r)),
+  clearRuns: () => fetch('/api/runs', { method: 'DELETE' }).then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); }),
+  wallet: () => fetch('/api/wallet').then((r) => json<WalletCredential[]>(r)),
 };
 
-type Listener = (msg: { type: 'event'; event: ProtocolEvent } | { type: 'run'; run: RunSummary }) => void;
+type LiveMessage = { type: 'event'; event: ProtocolEvent } | { type: 'run'; run: RunSummary };
+type Listener = (msg: LiveMessage) => void;
+export type ConnectionState = 'connecting' | 'open' | 'closed';
+
 const listeners = new Set<Listener>();
+const statusListeners = new Set<(s: ConnectionState) => void>();
 let socket: WebSocket | undefined;
+let connection: ConnectionState = 'connecting';
+let retry = 0;
+
+function setConnection(s: ConnectionState) {
+  connection = s;
+  for (const l of statusListeners) l(s);
+}
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  setConnection('connecting');
   socket = new WebSocket(`${proto}://${location.host}/ws`);
+  socket.onopen = () => { retry = 0; setConnection('open'); };
   socket.onmessage = (m) => {
-    const msg = JSON.parse(m.data);
+    let msg: LiveMessage;
+    try { msg = JSON.parse(m.data); } catch { return; }
     for (const l of listeners) l(msg);
   };
-  socket.onclose = () => setTimeout(connect, 1500);
+  socket.onclose = () => {
+    setConnection('closed');
+    // Back off up to 10 s so a stopped server isn't hammered.
+    setTimeout(connect, Math.min(10_000, 1000 * 2 ** retry++));
+  };
 }
+
+const ensureSocket = () => { if (!socket) connect(); };
 
 export function useLive(listener: Listener) {
   const ref = useRef(listener);
   ref.current = listener;
   useEffect(() => {
-    if (!socket) connect();
+    ensureSocket();
     const l: Listener = (m) => ref.current(m);
     listeners.add(l);
     return () => { listeners.delete(l); };
   }, []);
 }
 
+/** WebSocket state, for the "live updates paused" banner. */
+export function useConnection() {
+  const [state, setState] = useState<ConnectionState>(connection);
+  useEffect(() => {
+    ensureSocket();
+    setState(connection);
+    statusListeners.add(setState);
+    return () => { statusListeners.delete(setState); };
+  }, []);
+  return state;
+}
+
+/** Calls `fn` whenever the socket comes back after a drop, to catch up on missed updates. */
+export function useOnReconnect(fn: () => void) {
+  const ref = useRef(fn);
+  ref.current = fn;
+  useEffect(() => {
+    let wasClosed = false;
+    const l = (s: ConnectionState) => {
+      if (s === 'closed') wasClosed = true;
+      if (s === 'open' && wasClosed) { wasClosed = false; ref.current(); }
+    };
+    statusListeners.add(l);
+    return () => { statusListeners.delete(l); };
+  }, []);
+}
+
 /** All run summaries, kept current over the WebSocket. */
 export function useRuns() {
   const [runs, setRuns] = useState<RunSummary[]>([]);
-  useEffect(() => { api.runs().then(setRuns).catch(() => {}); }, []);
+  const [loaded, setLoaded] = useState(false);
+  const load = useCallback(() => { api.runs().then((r) => { setRuns(r); setLoaded(true); }).catch(() => setLoaded(true)); }, []);
+  useEffect(() => { load(); }, []);
+  useOnReconnect(load);
   useLive((m) => {
     if (m.type !== 'run') return;
     setRuns((prev) => {
@@ -134,7 +208,7 @@ export function useRuns() {
       return next;
     });
   });
-  return [runs, setRuns] as const;
+  return { runs, setRuns, loaded, reload: load };
 }
 
 export const scenarioLabel = (r: Pick<RunSummary, 'tamper' | 'expired'>, cat?: Catalog | null) =>
@@ -146,4 +220,4 @@ export function withoutSuperseded<T extends { id: string; retryOf?: string }>(ru
   return runs.filter((r) => !superseded.has(r.id));
 }
 
-export const formatDuration = (ms?: number) => (ms == null ? '—' : ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`);
+export { formatDuration } from './lib/format';
