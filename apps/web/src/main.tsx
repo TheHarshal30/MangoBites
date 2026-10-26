@@ -1,3 +1,4 @@
+/** Browser entry: self-hosted fonts, theme applied before first paint, then the React app. */
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@fontsource-variable/inter';

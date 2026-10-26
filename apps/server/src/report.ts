@@ -1,3 +1,9 @@
+/**
+ * Matrix sweeps and reporting: generates every automatable issuer × verifier × format × scenario
+ * combination (Reference Wallet as holder), runs them sequentially, retries failures once (a pass
+ * on retry is reported as flaky, not clean), and renders the Markdown compatibility report
+ * (docs/INTEROP_REPORT.md, GET /api/report.md).
+ */
 import { party, FORMATS, PARTIES } from './catalog.js';
 import { startRun, whenDone, validateInput, type Run, type RunInput } from './runs.js';
 import { TAMPER_MODES, type Tamper } from './actors/wallet.js';

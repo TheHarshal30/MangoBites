@@ -1,3 +1,11 @@
+/**
+ * Playground server entry point. One Express app serves:
+ *   /api/*      REST API for the UI and CI (catalog, runs, matrix sweeps, report, wallet) — docs/API.md
+ *   /ws         WebSocket that streams every protocol event and run update to the UI
+ *   /issuer     Reference Issuer (OpenID4VCI) and /verifier Reference Verifier (OpenID4VP)
+ *   /*          the built React UI (apps/web/dist), when present
+ * The Reference Wallet has no HTTP surface: the orchestrator (runs.ts) drives it in-process.
+ */
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
@@ -74,6 +82,7 @@ api.post('/matrix', (req, res) => {
   const batchId = `batch-${new Date().toISOString().slice(0, 19)}-${randomUUID().slice(0, 4)}`;
   activeMatrix = { batchId, total: inputs.length, done: 0 };
   runMatrix(inputs, batchId, (done) => { if (activeMatrix) activeMatrix.done = done; })
+    .catch((e) => console.error(`Sweep ${batchId} aborted: ${e.message}`))
     .finally(() => { activeMatrix = undefined; });
   res.status(202).json(activeMatrix);
 });

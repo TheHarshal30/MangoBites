@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inji Interoperability Playground · User flow</title>
+<link rel="stylesheet" href="diagram.css">
+<style>
+  #canvas { height: 1430px; }
+  .card { position: absolute; z-index: 2; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 12px; padding: 12px 14px 12px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .card .hd { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+  .card .no { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--fg); color: #fff; font-size: 11.5px; font-weight: 700; flex: none; }
+  .card .tt { font-size: 15px; font-weight: 650; color: var(--fg); }
+  .card .route { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--subtle); background: #f8fafc; border: 1px solid var(--line); border-radius: 5px; padding: 0 6px; white-space: nowrap; }
+  .card .thumb { box-shadow: 0 1px 3px rgba(15, 23, 42, .08); }
+  .card p { margin: 9px 0 0; }
+  .card ol { margin: 9px 0 0; padding-left: 18px; }
+  .card ol li { margin-top: 3px; }
+  .card b { color: var(--fg); font-weight: 650; }
+  .card.phone { border-color: var(--inji); border-style: dashed; }
+  .card.phone .no { background: var(--inji); }
+
+  .section { position: absolute; z-index: 0; border: 1.5px solid #e2e8f0; border-radius: 18px; background: #fbfcfd; }
+  .tab { position: absolute; z-index: 2; display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 650; color: var(--fg); background: #fff; border: 1.5px solid #cbd5e1; border-radius: 9px; padding: 4px 11px; }
+  .tab .ico { width: 14px; height: 14px; border-radius: 4px; background: var(--inji); }
+  .tab .sub { font-weight: 500; color: var(--subtle); font-size: 12px; }
+
+  .act { position: absolute; z-index: 3; transform: translate(-50%, -50%); background: #fff; border: 1.5px solid #cbd5e1; border-radius: 999px; padding: 3px 11px; font-size: 12px; font-weight: 650; color: var(--fg); white-space: nowrap; text-align: center; line-height: 1.3; }
+  .act.primary { background: var(--inji); border-color: var(--inji); color: #fff; }
+  .act.phone { border-color: #fdba74; color: #c2410c; }
+  .hint { position: absolute; z-index: 3; transform: translate(-50%, -50%); font-size: 11px; color: var(--subtle); white-space: nowrap; text-align: center; line-height: 1.35; }
+
+  .nav { position: absolute; z-index: 2; display: flex; align-items: center; gap: 6px; border: 1.5px solid #e2e8f0; border-radius: 12px; padding: 6px 10px; background: #fff; font-size: 13px; }
+  .nav .logo { width: 22px; height: 22px; border-radius: 6px; background: var(--inji); }
+  .nav .brand { font-weight: 650; margin-right: 12px; }
+  .nav .t { padding: 4px 10px; border-radius: 7px; color: var(--muted); font-weight: 550; }
+  .nav .t.on { background: #f1f5f9; color: var(--fg); }
+  .nav .note { margin-left: 14px; color: var(--subtle); font-size: 12px; }
+  .qr { width: 86px; height: 86px; flex: none; border-radius: 8px; border: 1px solid var(--line);
+    background:
+      linear-gradient(90deg, #0f172a 0 0) 8px 8px / 22px 22px no-repeat,
+      linear-gradient(90deg, #fff 0 0) 12px 12px / 14px 14px no-repeat,
+      linear-gradient(90deg, #0f172a 0 0) 16px 16px / 6px 6px no-repeat,
+      linear-gradient(90deg, #0f172a 0 0) 56px 8px / 22px 22px no-repeat,
+      linear-gradient(90deg, #fff 0 0) 60px 12px / 14px 14px no-repeat,
+      linear-gradient(90deg, #0f172a 0 0) 64px 16px / 6px 6px no-repeat,
+      linear-gradient(90deg, #0f172a 0 0) 8px 56px / 22px 22px no-repeat,
+      linear-gradient(90deg, #fff 0 0) 12px 60px / 14px 14px no-repeat,
+      linear-gradient(90deg, #0f172a 0 0) 16px 64px / 6px 6px no-repeat,
+      repeating-conic-gradient(#0f172a 0 25%, #fff 0 50%) 34px 34px / 8px 8px no-repeat,
+      repeating-conic-gradient(#0f172a 0 25%, #fff 0 50%) 0 0 / 12px 12px;
+    background-color: #fff; }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <div class="heading">
+    <h1>Inji Interoperability Playground · User flow</h1>
+    <p>Four tabs. The Playground tab runs one flow and shows it live; the matrix and history open any earlier run in the same run view; the wallet lists what the Reference Wallet holds. Screens are from the running app.</p>
+  </div>
+
+  <div class="nav" style="left:40px; top:118px;">
+    <span class="logo"></span><span class="brand">Inji Interop Playground</span>
+    <span class="t on">Playground</span><span class="t">Interop matrix</span><span class="t">Run history</span><span class="t">Wallet</span>
+    <span class="note">Header tabs are always visible. Views use hash routes, so every tab and every run has a shareable link.</span>
+  </div>
+
+  <!-- ── Playground tab ── -->
+  <div class="section" style="left:24px; top:176px; width:1552px; height:752px;"></div>
+  <div class="tab" style="left:44px; top:162px;"><span class="ico"></span>Playground<span class="sub">#playground</span></div>
+
+  <div class="card" id="intro" style="left:52px; top:206px; width:384px; height:240px; border-style:dashed;">
+    <div class="hd"><span class="tt">Two ways through a run</span></div>
+    <p style="margin-top:0;"><b>Reference Wallet</b> (default): the run goes straight through issue, hold, present and verify in about a second.</p>
+    <p><b>Inji Wallet (mobile)</b>: the run pauses and the run view shows QR codes for the phone (top row). Tamper scenarios need the Reference Wallet, since a real wallet will not forge a presentation.</p>
+    <p>Every run is saved and can be reopened from Run history or the Interop matrix.</p>
+  </div>
+
+  <div class="card phone" id="offer" style="left:610px; top:206px; width:384px; height:240px;">
+    <div class="hd"><span class="no">A</span><span class="tt">Scan the credential offer</span></div>
+    <img class="thumb" src="../img/ui-manual-offer.png" style="height:106px;" alt="">
+    <p>The run waits at Issue. Scan the offer QR in Inji Wallet (enter the transaction code if asked), or use <b>Open in wallet on this device</b>.</p>
+  </div>
+
+  <div class="card phone" id="request" style="left:1166px; top:206px; width:384px; height:240px;">
+    <div class="hd"><span class="no">B</span><span class="tt">Scan the presentation request</span></div>
+    <div style="display:flex; gap:14px; align-items:flex-start;">
+      <div class="qr"></div>
+      <div>After <b>Credential received</b> the run moves to Present and shows the request QR. Scan it in Inji Wallet and share the credential.</div>
+    </div>
+    <p>The verifier's answer arrives like any other run: stages, verdict and inspector fill in.</p>
+  </div>
+
+  <div class="card" id="config" style="left:52px; top:520px; width:384px; height:384px;">
+    <div class="hd"><span class="no">1</span><span class="tt">Configure a flow</span><span class="route">#playground</span></div>
+    <img class="thumb" src="../img/ui-playground.png" style="height:222px;" alt="">
+    <p>Pick an issuer, a wallet and a verifier in the three columns, then a format (JSON-LD, SD-JWT, mDoc) and a scenario. The expected verdict is shown next to <b>Run flow</b>; combinations a party can't do are disabled, with the reason.</p>
+  </div>
+
+  <div class="card" id="run" style="left:610px; top:520px; width:384px; height:384px;">
+    <div class="hd"><span class="no">2</span><span class="tt">Watch the run live</span><span class="route">#playground/&lt;run id&gt;</span></div>
+    <img class="thumb" src="../img/ui-run.png" style="height:222px;" alt="">
+    <p>Stage tracker (Issue, Hold, Present, Verify), the verdict with the verifier's actual answer against the expected one, every verification check, a live sequence diagram and the protocol inspector.</p>
+  </div>
+
+  <div class="card" id="decoded" style="left:1166px; top:520px; width:384px; height:384px;">
+    <div class="hd"><span class="no">3</span><span class="tt">Open one message</span></div>
+    <img class="thumb" src="../img/ui-run-decoded.png" style="height:222px;" alt="">
+    <p>Click a numbered arrow in the diagram or a row in the inspector. <b>Decoded</b> shows JWT header and payload, SD-JWT disclosures, KB-JWT, VP and presentation definition; <b>Request</b> (with copy as cURL) and <b>Response</b> show the raw exchange.</p>
+  </div>
+
+  <!-- ── Other tabs ── -->
+  <div class="section" style="left:24px; top:990px; width:500px; height:416px;"></div>
+  <div class="tab" style="left:44px; top:976px;"><span class="ico" style="background:#475569"></span>Interop matrix<span class="sub">#matrix</span></div>
+  <div class="card" id="matrix" style="left:44px; top:1016px; width:460px; height:372px;">
+    <img class="thumb" src="../img/ui-matrix.png" style="height:214px;" alt="">
+    <ol>
+      <li>Choose the sweep scenarios, then <b>Run sweep</b>: every issuer × verifier × format × scenario the Reference Wallet can drive (65 runs), with live progress.</li>
+      <li>Read the grid, the pass-rate tiles and the failures list.</li>
+      <li>Click a cell, or <b>Open run</b> on a failure, to open that run.</li>
+    </ol>
+    <p style="margin-top:6px;"><b>Export report</b> downloads the markdown matrix.</p>
+  </div>
+
+  <div class="section" style="left:550px; top:990px; width:500px; height:416px;"></div>
+  <div class="tab" style="left:570px; top:976px;"><span class="ico" style="background:#475569"></span>Run history<span class="sub">#history</span></div>
+  <div class="card" id="history" style="left:570px; top:1016px; width:460px; height:372px;">
+    <img class="thumb" src="../img/ui-history.png" style="height:214px;" alt="">
+    <ol>
+      <li>Search, or filter by issuer, verifier, format, scenario, outcome and module version; sort by time or duration.</li>
+      <li>Read the stat tiles: runs, pass rate, failures, average duration.</li>
+      <li>Click a row to open that run.</li>
+    </ol>
+    <p style="margin-top:6px;"><b>Export report</b> or <b>Clear history</b> (asks to confirm).</p>
+  </div>
+
+  <div class="section" style="left:1076px; top:990px; width:500px; height:416px;"></div>
+  <div class="tab" style="left:1096px; top:976px;"><span class="ico" style="background:var(--wallet)"></span>Wallet<span class="sub">#wallet</span></div>
+  <div class="card" id="wgrid" style="left:1096px; top:1016px; width:176px; height:372px; padding:10px;">
+    <img class="thumb" src="../img/ui-wallet.png" style="height:214px; object-position:0 22%;" alt="">
+    <p>Credentials the Reference Wallet holds, newest first. Filter by format or issuer, search names and claims.</p>
+  </div>
+  <div class="card" id="wsheet" style="left:1380px; top:1016px; width:176px; height:372px; padding:10px;">
+    <img class="thumb" src="../img/ui-wallet-sheet.png" style="height:214px; object-position:100% 0;" alt="">
+    <p>Detail sheet: the card, format, configuration, issuer, received and expiry dates with validity, and every claim.</p>
+  </div>
+</div>
+
+<script src="diagram.js"></script>
+<script>
+document.fonts.ready.then(() => {
+  const { a, edge } = D;
+  D.init();
+  const cv = document.getElementById('canvas');
+  const put = (cls, [x, y], html) => {
+    const el = document.createElement('div');
+    el.className = cls; el.innerHTML = html; el.style.left = `${x}px`; el.style.top = `${y}px`;
+    cv.appendChild(el); return el;
+  };
+  const ink = '#334155', orange = '#ea580c';
+
+  /* Main row */
+  const [cr] = [a('config', 'r', .30)];
+  edge([cr, [610, cr[1]]], { color: ink });
+  put('act primary', [523, cr[1]], '▶&nbsp; Run flow');
+  put('hint', [523, cr[1] + 24], 'or Ctrl / ⌘ + Enter');
+  const back = a('run', 'l', .70);
+  edge([back, [436, back[1]]], { color: ink });
+  put('act', [523, back[1]], 'Configure');
+  put('hint', [523, back[1] + 31], 'edit the next run;<br>this run stays as it was');
+
+  const rd = a('run', 'r', .62);
+  edge([rd, [1166, rd[1]]], { color: ink });
+  put('act', [1080, rd[1]], 'open a message');
+  put('hint', [1080, rd[1] + 30], 'click an arrow in the<br>diagram or an inspector row');
+
+  /* Run again: loop on the run card's right edge, above the decoded edge */
+  const r1 = a('run', 'r', .12), r2 = a('run', 'r', .30);
+  edge([r1, [1018, r1[1]], [1018, r2[1]], r2], { color: ink, radius: 12 });
+  put('act', [1094, (r1[1] + r2[1]) / 2 - 8], '↻ Run again');
+  put('hint', [1094, (r1[1] + r2[1]) / 2 + 17], 'same flow, new run');
+
+  /* Manual branch */
+  const up = a('run', 't', .30);
+  edge([up, a('offer', 'b', .30)], { color: orange, dash: 'dash' });
+  put('act phone', [up[0], 483], 'wallet = Inji Wallet (mobile)');
+  const o2 = a('offer', 'r', .45);
+  edge([o2, [1166, o2[1]]], { color: orange, dash: 'dash' });
+  put('act phone', [1080, o2[1]], 'Credential received');
+  put('hint', [1080, o2[1] + 25], 'after the phone accepts');
+  const rq = a('request', 'b', .5);
+  const ry = a('run', 't', .5)[1];
+  edge([rq, [rq[0], 483], [a('run', 't', .78)[0], 483], [a('run', 't', .78)[0], ry]], { color: orange, dash: 'dash' });
+  put('act phone', [(rq[0] + a('run', 't', .78)[0]) / 2 + 30, 483], 'share on the phone → verdict');
+
+  /* Matrix and history open runs in the run view */
+  const mt = a('matrix', 't', .86), hx = a('run', 'b', .5)[0];
+  const midY = 952;
+  const mx = a('run', 'b', .22)[0];
+  edge([[mt[0], 990], [mt[0], midY], [mx, midY], a('run', 'b', .22)], { color: ink });
+  put('act', [mt[0], 966], 'click a cell');
+  edge([[a('history', 't', .5)[0], 990], [a('history', 't', .5)[0], 904]], { color: ink });
+  put('act', [a('history', 't', .5)[0] + 70, 958], 'click a row');
+
+  /* Wallet: card → sheet */
+  const wg = a('wgrid', 'r', .2);
+  edge([wg, [1380, wg[1]]], { color: ink });
+  put('act', [1326, wg[1] - 22], 'click a card');
+
+  window.__issues = D.audit('.card, .act, .tab, .nav, .hint').filter((i) => !/× (Two ways|1 |2 |3 |A |B )/.test(i));
+  for (const c of document.querySelectorAll('.card')) if (c.scrollHeight > c.clientHeight + 1) window.__issues.push(`card overflow: ${c.id} (+${c.scrollHeight - c.clientHeight}px)`);
+  window.__ready = true;
+});
+</script>
+</body>
+</html>

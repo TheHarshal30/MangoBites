@@ -1,3 +1,7 @@
+/**
+ * Run history: every run with its verdict, filterable by party, format, scenario, outcome and
+ * module version (for regression tracking across Inji releases), with search, sort and pagination.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent, type ReactNode } from 'react';
 import {
   Activity, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ChevronsUpDown, CircleCheck, CircleX, Download, FlaskConical,

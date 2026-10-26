@@ -1,3 +1,9 @@
+/**
+ * Playground view: the issuer / wallet / verifier configurator, and the run view below it.
+ * With no run open it shows the full configurator and recent runs; once a run is open the
+ * configurator collapses into a one-line flow bar (Run again / Configure) so the result stays in view.
+ * Opening a run loads its configuration, so "Run again" repeats exactly that flow.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronRight, ChevronUp, Info, KeyRound, Play, RotateCcw, Settings2, Smartphone, TriangleAlert } from 'lucide-react';
 import { api, type Format, type Party } from '../api';

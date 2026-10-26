@@ -70,8 +70,10 @@ export async function awaitInjiVpResult(runId: string, requestId: string, transa
       first = false;
     }
   }
+  // No submission is not a verdict. Grading it INVALID would turn a wallet or network failure into a
+  // PASS for every attack scenario, so it is reported as an error (the run FAILs with this message).
   if (status !== 'VP_SUBMITTED') {
-    return { status: 'INVALID', checks: [{ name: 'Presentation received', ok: false, detail: `request status ${status}` }] };
+    throw new Error(`Inji Verify never received a presentation (request status ${status} after ${Math.round(timeoutMs / 1000)}s)`);
   }
   const res = await traced({
     runId, step: 'OpenID4VP · Fetch result (Inji Verify /vp-result)', from: 'playground', to: 'verifier',

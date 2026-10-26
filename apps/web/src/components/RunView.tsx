@@ -1,3 +1,9 @@
+/**
+ * One run, live: header with the verdict and a plain-language explanation of the result, the stage
+ * tracker, verification checks, the sequence diagram, the credential, and the protocol inspector.
+ * Starts from GET /api/runs/:id and then merges WebSocket events as they arrive.
+ * For the manual Inji Wallet (mobile) mode it shows the QR codes and the "credential received" step.
+ */
 import { Fragment, useEffect, useState } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {

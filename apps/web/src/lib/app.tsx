@@ -1,3 +1,8 @@
+/**
+ * App-wide data context: the party catalog (polled for service health), all run summaries (kept
+ * live over the WebSocket), the active matrix sweep, and the connection state. Views read it with
+ * useApp() / useCatalog() instead of threading props.
+ */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api, useConnection, useRuns, type Catalog, type ConnectionState, type Party, type RunSummary } from '../api';
 

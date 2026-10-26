@@ -1,3 +1,12 @@
+/**
+ * Run orchestrator: executes one issue → hold → present → verify cycle for a chosen
+ * issuer × wallet × verifier × format × scenario, and grades it.
+ *
+ * Grading is the core rule of the playground: each scenario has an expected verdict (VALID for the
+ * happy path, EXPIRED for an expired credential, INVALID for every tamper mode), and a run PASSes
+ * only when the verifier returns exactly that — so a verifier that accepts a forgery FAILs.
+ * Runs are persisted under DATA_DIR/runs and broadcast on `runUpdates` for the WebSocket.
+ */
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -100,9 +109,16 @@ export function getRun(id: string) {
   return runs.get(id);
 }
 
+/**
+ * Deletes every finished run. Runs still executing are kept: a matrix sweep is waiting on them,
+ * and removing one under it used to crash the server (whenDone() read a run that no longer existed).
+ */
 export function deleteRuns() {
-  runs.clear();
-  fs.rmSync(runsDir(), { recursive: true, force: true });
+  for (const [id, r] of runs) {
+    if (r.state === 'running') continue;
+    runs.delete(id);
+    fs.rmSync(path.join(runsDir(), `${id}.json`), { force: true });
+  }
 }
 
 /** Phone-wallet runs pause until the user confirms the step happened on the device. */
@@ -168,16 +184,18 @@ export function startRun(input: RunInput): Run {
     events: [],
   };
   runs.set(run.id, run);
+  persist(run); // so load() can mark it "Interrupted by server restart" if the server dies mid-run
   publish(run);
   void execute(run);
   return run;
 }
 
-/** Resolves once the run has finished (used by the matrix sweep and the CLI). */
+/** Resolves once the run has finished (used by the matrix sweep and the CLI); rejects if it was deleted. */
 export function whenDone(id: string): Promise<Run> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const check = () => {
-      const r = runs.get(id)!;
+      const r = runs.get(id);
+      if (!r) { runUpdates.off('run', onRun); reject(new Error(`run ${id} was deleted`)); return true; }
       if (r.state !== 'running') { runUpdates.off('run', onRun); resolve(r); return true; }
       return false;
     };
@@ -189,6 +207,7 @@ export function whenDone(id: string): Promise<Run> {
 
 async function execute(run: Run) {
   const started = Date.now();
+  let rejectedAtSubmission: VerificationOutcome | undefined;
   const stage = (name: keyof Run['stages'], status: StageStatus, detail?: string) => {
     run.stages[name] = { status, detail };
     publish(run);
@@ -265,15 +284,20 @@ async function execute(run: Run) {
         const sent = await presentCredential(run.id, request.authorizationRequestUri, credential, run.tamper);
         if (sent.status >= 400) {
           emit({ runId: run.id, step: 'OpenID4VP · Verifier rejected submission', kind: 'note', from: 'verifier', to: 'wallet', summary: `response_uri returned ${sent.status}`, data: { response: sent.response } });
+          // Inji Verify stores nothing for a submission it refuses at response_uri, so its status would
+          // stay ACTIVE until the timeout. The refusal itself is the verdict.
+          if (run.verifier !== 'playground-verifier') {
+            rejectedAtSubmission = { status: 'INVALID', checks: [{ name: 'Verifier accepted the submission', ok: false, detail: `response_uri returned HTTP ${sent.status}` }] };
+          }
         }
       }
       stage('present', 'done');
       current = 'verify';
       stage('verify', 'running');
       const timeout = manual ? 10 * 60_000 : 60_000;
-      outcome = run.verifier === 'playground-verifier'
+      outcome = rejectedAtSubmission ?? (run.verifier === 'playground-verifier'
         ? await awaitPlaygroundResult((request as any).id, timeout)
-        : await awaitInjiVpResult(run.id, (request as any).requestId, (request as any).transactionId, timeout);
+        : await awaitInjiVpResult(run.id, (request as any).requestId, (request as any).transactionId, timeout));
     }
 
     /* 3 ─ Grade */

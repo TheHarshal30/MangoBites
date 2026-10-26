@@ -1,6 +1,7 @@
 {
   "name": "@playground/web",
   "private": true,
+  "license": "MPL-2.0",
   "type": "module",
   "scripts": {
     "dev": "node ../../node_modules/vite/bin/vite.js",

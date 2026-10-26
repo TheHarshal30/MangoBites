@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inji Interoperability Playground · System architecture</title>
+<link rel="stylesheet" href="diagram.css">
+<style>
+  #canvas { height: 1046px; }
+  .node .api { font-family: var(--mono); font-size: 11px; line-height: 1.62; color: var(--fg); margin-top: 6px; }
+  .node .api b { display: inline-block; width: 36px; font-weight: 600; color: var(--subtle); }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 6px; }
+  .cols .h { font-weight: 650; font-size: 11.5px; }
+  .node.small { font-size: 12px; }
+  .node .h { font-weight: 650; color: var(--fg); }
+  .elabel.tiny { font-size: 10.5px; font-weight: 500; color: #64748b; background: transparent; padding: 0; }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <div class="heading">
+    <h1>Inji Interoperability Playground · System architecture</h1>
+    <p>One Docker Compose stack. The playground container holds the UI, the API, the run orchestrator and three independent reference parties; Inji Certify and Inji Verify run next to it. Every HTTP exchange is traced and pushed to the browser over WebSocket.</p>
+  </div>
+
+  <!-- ── Deployment boundaries ── -->
+  <div class="frame" style="left:290px; top:132px; width:1110px; height:830px;"></div>
+  <div class="frame-label" style="left:308px; top:141px;">Docker Compose<span class="sub">project inji-playground · ./scripts/up.sh · network 172.31.250.0/24</span></div>
+
+  <div class="frame solid tint-ref" style="left:304px; top:168px; width:672px; height:780px;"></div>
+  <div class="frame-label" style="left:320px; top:177px;">playground container<span class="sub">Node 22 · port 4000 · apps/server (TypeScript, Express 5, ws)</span></div>
+
+  <div class="frame" style="left:550px; top:206px; width:412px; height:726px; border-color:#cbd5e1;"></div>
+  <div class="frame-label caps" style="left:566px; top:216px;">Protocol parties</div>
+
+  <div class="frame-label caps" style="left:1124px; top:216px;">Inji services</div>
+  <div class="frame-label caps" style="left:28px; top:141px;">Host &amp; CI</div>
+  <div class="frame-label caps" style="left:1424px; top:141px;">Optional · external</div>
+
+  <!-- ── Clients ── -->
+  <div class="node ctl small" id="gh" style="left:28px; top:166px; width:186px; height:128px;">
+    <div class="role c-infra">CI · nightly</div>
+    <div class="title">GitHub Actions</div>
+    <div class="meta mono">workflows/interop.yml</div>
+    <p>Runs <code>up.sh</code>, then <code>npm run interop</code>. Fails on a happy-path regression.</p>
+  </div>
+
+  <div class="node ctl small" id="browser" style="left:28px; top:316px; width:186px; height:616px;">
+    <div class="role c-infra">Host browser</div>
+    <div class="title">React UI</div>
+    <div class="meta">http://localhost:4000, served by the playground container</div>
+    <hr>
+    <div class="h">Tabs (hash routes)</div>
+    <div>Playground · Interop matrix · Run history · Wallet</div>
+    <hr>
+    <div class="h">Playground</div>
+    <div>3-column issuer → wallet → verifier selector, format, scenario</div>
+    <hr>
+    <div class="h">Run view</div>
+    <ul>
+      <li>stage tracker and verdict</li>
+      <li>verification checks</li>
+      <li>live Mermaid sequence diagram</li>
+      <li>protocol inspector: decoded JWT, SD-JWT, KB-JWT, VP, presentation definition</li>
+      <li>QR codes and deep links for a phone wallet</li>
+    </ul>
+    <hr>
+    <div>REST for the catalog and runs, WebSocket for live events.</div>
+    <div class="meta" style="margin-top:8px;">React 18 · Vite 6 · Tailwind 4 · Mermaid 11 · qrcode.react</div>
+  </div>
+
+  <!-- ── Playground: control column ── -->
+  <div class="node ctl" id="api" style="left:320px; top:212px; width:188px; height:180px;">
+    <div class="role c-ref">API</div>
+    <div class="title">Express <span class="mono" style="font-weight:500; font-size:12.5px;">/api</span></div>
+    <div class="api">
+      <div><b>GET</b>/catalog</div>
+      <div><b>POST</b>/runs</div>
+      <div><b>GET</b>/runs[/:id]</div>
+      <div><b>POST</b>/runs/:id/signal</div>
+      <div><b>POST</b>/matrix</div>
+      <div><b>GET</b>/report.md</div>
+      <div><b>GET</b>/wallet</div>
+    </div>
+  </div>
+
+  <div class="node ctl" id="orch" style="left:320px; top:420px; width:188px; height:168px;">
+    <div class="role c-ref">Orchestrator</div>
+    <div class="title">runs.ts · report.ts</div>
+    <p>Issue → Hold → Present → Verify, then grade: PASS only if the verdict equals the expected one.</p>
+    <p class="meta">Sweep retries a failed run once.</p>
+  </div>
+
+  <div class="node ctl" id="store" style="left:320px; top:614px; width:188px; height:86px;">
+    <div class="role c-ref">Persistence · volume</div>
+    <div class="mono" style="color:var(--fg); font-size:11px; margin-top:3px; line-height:1.55;">data/runs/&lt;id&gt;.json<br>data/wallet.json<br>data/keys.json</div>
+  </div>
+
+  <div class="node ctl" id="bus" style="left:320px; top:724px; width:188px; height:140px;">
+    <div class="role c-ref">Tracer → event bus</div>
+    <p style="margin-top:2px;"><code>http.ts</code> wraps every outgoing call; <code>/issuer</code> and <code>/verifier</code> also log calls from a phone. <code>events.ts</code> emits one event per exchange.</p>
+  </div>
+
+  <div class="node ctl" id="ws" style="left:320px; top:884px; width:188px; height:48px; padding-top:6px;">
+    <div class="title" style="font-size:13.5px;">WebSocket <span class="mono" style="font-weight:500;">/ws</span></div>
+    <div class="meta" style="margin-top:0;">pushes events + run updates</div>
+  </div>
+
+  <!-- ── Playground: protocol parties ── -->
+  <div class="node ref" id="refIssuer" style="left:566px; top:244px; width:206px; height:170px;">
+    <div class="role c-issuer">Issuer <span class="pill ref">Reference</span></div>
+    <div class="title">Reference Issuer</div>
+    <div class="meta"><code>/issuer</code> · OpenID4VCI draft 13</div>
+    <ul>
+      <li>pre-authorized code</li>
+      <li>validates the proof JWT: typ, aud, c_nonce</li>
+      <li>JSON-LD · SD-JWT · mDoc</li>
+    </ul>
+  </div>
+
+  <div class="node ctl" id="certAdapter" style="left:782px; top:244px; width:164px; height:170px;">
+    <div class="role c-issuer">Issuer adapter</div>
+    <div class="title">Inji Certify adapter</div>
+    <div class="meta mono" style="font-size:10.5px;">inji-certify.ts</div>
+    <ul>
+      <li>creates offers via <code style="font-size:.84em">/pre-authorized-data</code></li>
+      <li>registers credential configurations</li>
+    </ul>
+  </div>
+
+  <div class="node ref" id="refWallet" style="left:566px; top:458px; width:380px; height:154px;">
+    <div class="role c-wallet">Wallet <span class="pill ref">Reference</span></div>
+    <div class="title">Reference Wallet <span class="v">headless, driven by the orchestrator</span></div>
+    <div class="cols">
+      <div><div class="h c-issuer">OpenID4VCI</div>offer → metadata → token → proof JWT → credential</div>
+      <div><div class="h c-verifier">OpenID4VP</div>request → presentation definition → vp_token → direct_post</div>
+    </div>
+    <div class="meta" style="margin-top:6px;">Tamper: bad signature · wrong type · replay · wrong holder</div>
+  </div>
+
+  <div class="node ref" id="refVerifier" style="left:566px; top:656px; width:206px; height:182px;">
+    <div class="role c-verifier">Verifier <span class="pill ref">Reference</span></div>
+    <div class="title">Reference Verifier</div>
+    <div class="meta"><code>/verifier</code> · OpenID4VP draft 21</div>
+    <ul>
+      <li>direct_post · redirect_uri client</li>
+      <li>checks issuer proof, holder binding, nonce and aud, submission, expiry</li>
+    </ul>
+  </div>
+
+  <div class="node ctl" id="verAdapter" style="left:782px; top:656px; width:164px; height:182px;">
+    <div class="role c-verifier">Verifier adapter</div>
+    <div class="title">Inji Verify adapter</div>
+    <div class="meta mono" style="font-size:10.5px;">inji-verify.ts</div>
+    <ul>
+      <li><code>/vp-request</code>, poll status, <code>/vp-result</code></li>
+      <li>VC upload: <code>/vc-verification</code></li>
+    </ul>
+  </div>
+
+  <div class="node ctl small" id="formats" style="left:566px; top:858px; width:380px; height:54px; padding:6px 12px; line-height:1.4;">
+    <span class="h">formats/</span> &nbsp;ldp: digitalbazaar vc, Ed25519Signature2020 · sdjwt: jose, ES256 + KB-JWT · mdoc: @auth0/mdl (mock)
+  </div>
+
+  <!-- ── Inji services ── -->
+  <div class="node inji" id="certify" style="left:1124px; top:244px; width:262px; height:182px;">
+    <div class="role c-issuer">Issuer <span class="pill inji">Inji</span></div>
+    <div class="title">Inji Certify <span class="v">0.14.0</span></div>
+    <div class="meta">behind nginx on <b>:8090</b> · <code>/v1/certify/*</code></div>
+    <ul>
+      <li>DataProvider plugin, pre-authorized code</li>
+      <li>its own authorization server (no eSignet)</li>
+      <li>did:key issuer (<code>npm run setup</code>)</li>
+    </ul>
+  </div>
+
+  <div class="node infra" id="pg" style="left:1124px; top:494px; width:124px; height:116px;">
+    <div class="role c-infra">Database</div>
+    <div class="title" style="font-size:13.5px;">Postgres 15</div>
+    <div class="meta"><b>:5433</b></div>
+    <div class="mono" style="font-size:10.5px; color:var(--fg); margin-top:3px; line-height:1.5;">inji_certify<br>inji_verify</div>
+  </div>
+
+  <div class="node infra" id="mirror" style="left:1260px; top:494px; width:126px; height:116px;">
+    <div class="role c-infra">JSON-LD</div>
+    <div class="title" style="font-size:13.5px;">Context mirror</div>
+    <div class="meta" style="line-height:1.4;">nginx; serves w3.org and w3id.org contexts locally</div>
+  </div>
+
+  <div class="node inji" id="verify" style="left:1124px; top:664px; width:262px; height:174px;">
+    <div class="role c-verifier">Verifier <span class="pill inji">Inji</span></div>
+    <div class="title">Inji Verify <span class="v">0.16.0</span></div>
+    <div class="meta">verify-service on <b>:8082</b> · <code>/v1/verify/*</code></div>
+    <ul>
+      <li>OpenID4VP: <code>/vp-request</code> → wallet <code>direct_post</code> → <code>/vp-result</code></li>
+      <li>VC upload: <code>/vc-verification</code></li>
+    </ul>
+  </div>
+
+  <!-- ── Optional external ── -->
+  <div class="node inji small" id="phone" style="left:1426px; top:450px; width:154px; height:252px; border-style:dashed;">
+    <div class="role c-wallet">Wallet <span class="pill inji">Inji</span></div>
+    <div class="title">Inji Wallet</div>
+    <div class="meta">mobile app ≥ 0.20, manual mode</div>
+    <p>Scans the offer and request QR codes (or deep links) shown in the run view.</p>
+    <p>Reaches the stack over LAN or ngrok: <code>PUBLIC_BASE_URL</code>, <code>VERIFY_PUBLIC_URL</code>.</p>
+  </div>
+
+  <!-- ── Legend ── -->
+  <div class="legend" style="left:28px; top:988px; width:1560px;">
+    <span class="title">Legend</span>
+    <span class="item"><b class="c-issuer">ISSUER</b> <b class="c-wallet">WALLET</b> <b class="c-verifier">VERIFIER</b> role</span>
+    <span class="item"><span class="sw" style="border-color:var(--inji)"></span>Inji</span>
+    <span class="item"><span class="sw" style="border-color:var(--ref)"></span>Reference (non-Inji)</span>
+    <span class="item"><span class="sw" style="border-color:#cbd5e1"></span>playground internals</span>
+    <span class="item"><span class="sw" style="border-color:#9ca3af; background:#f9fafb"></span>infrastructure</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#7c3aed" stroke-width="2"/></svg>OpenID4VCI</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#0d9488" stroke-width="2"/></svg>OpenID4VP</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#475569" stroke-width="2"/></svg>REST · WebSocket · internal</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#9ca3af" stroke-width="2"/></svg>SQL · HTTPS</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#475569" stroke-width="2" stroke-dasharray="6 4"/></svg>optional, manual</span>
+  </div>
+</div>
+
+<script src="diagram.js"></script>
+<script>
+document.fonts.ready.then(() => {
+  const { C, a, edge } = D;
+  D.init();
+  const tiny = (at, html) => ({ at, html, cls: 'tiny' });
+
+  /* Clients → API */
+  const gy = 240, by = 340;
+  edge([[214, gy], [320, gy]], { color: C.ctl, label: { at: [252, gy - 12], html: 'REST' } });
+  edge([[214, by], [320, by]], { color: C.ctl, label: { at: [252, by - 12], html: 'REST' } });
+  const wy = a('ws', 'l')[1];
+  edge([[320, wy], [214, wy]], { color: C.ctl, label: { at: [252, wy - 13], html: 'WebSocket' } });
+
+  /* Control column */
+  edge([a('api', 'b', .5), a('orch', 't', .5)], { color: C.ctl, label: tiny([470, 406], 'startRun · runMatrix') });
+  edge([a('orch', 'b', .5), a('store', 't', .5)], { color: C.ctl, label: tiny([446, 601], 'persist') });
+  edge([a('bus', 'b', .5), a('ws', 't', .5)], { color: C.ctl });
+  const dy = 500;
+  edge([[508, dy], [550, dy]], { color: C.ctl, label: tiny([529, dy - 12], 'drives') });
+  const ty = 793;
+  edge([[550, ty], [508, ty]], { color: C.ctl, dash: 'dot', width: 2.2, label: tiny([529, ty - 12], 'traces') });
+
+  /* Reference parties (HTTP inside the container) */
+  const wx = 669;
+  edge([[wx, 458], [wx, 414]], { color: C.issuer, label: { at: [wx + 44, 436], html: 'OpenID4VCI', cls: 'clear' } });
+  edge([[wx, 612], [wx, 656]], { color: C.verifier, label: { at: [wx + 78, 634], html: 'OpenID4VP <span style="font-weight:500; color:#64748b;">direct_post</span>', cls: 'clear' } });
+
+  /* Playground → Inji */
+  const xj = 1086, lx = 1030;
+  edge([[946, 292], [1124, 292]], { color: C.ctl, label: { at: [lx + 4, 274], html: 'REST<small>POST /pre-authorized-data</small>' } });
+  edge([[946, 506], [xj, 506], [xj, 392], [1124, 392]], { color: C.issuer, label: { at: [lx - 14, 486], html: 'OpenID4VCI<small>offer · token · credential</small>' } });
+  edge([[946, 590], [xj, 590], [xj, 718], [1124, 718]], { color: C.verifier, label: { at: [lx - 14, 612], html: 'OpenID4VP<small>direct_post vp_token</small>' } });
+  edge([[946, 806], [1124, 806]], { color: C.ctl, label: { at: [lx + 4, 788], html: 'REST<small>/vp-request · status · /vp-result</small>' } });
+
+  /* Inji → infrastructure */
+  const sx = 1186, hx = 1323;
+  const grey = { color: '#6b7280' };
+  edge([[sx, 426], [sx, 494]], { color: C.infra, label: { at: [sx, 460], html: 'SQL', style: grey } });
+  edge([[sx, 664], [sx, 610]], { color: C.infra, label: { at: [sx, 637], html: 'SQL', style: grey } });
+  edge([[hx, 426], [hx, 494]], { color: C.infra, label: { at: [hx, 460], html: 'HTTPS <span style="font-weight:500">@context</span>', style: grey } });
+  edge([[hx, 664], [hx, 610]], { color: C.infra, label: { at: [hx, 637], html: 'HTTPS <span style="font-weight:500">@context</span>', style: grey } });
+
+  /* Phone (optional) */
+  const px = 1503;
+  edge([[px, 450], [px, 344], [1386, 344]], { color: C.issuer, dash: 'dash', label: { at: [1446, 328], html: 'OpenID4VCI' } });
+  edge([[px, 702], [px, 770], [1386, 770]], { color: C.verifier, dash: 'dash', label: { at: [1446, 794], html: 'OpenID4VP<small>direct_post</small>' } });
+
+  window.__issues = D.audit();
+  window.__ready = true;
+});
+</script>
+</body>
+</html>

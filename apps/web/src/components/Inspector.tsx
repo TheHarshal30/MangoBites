@@ -1,3 +1,8 @@
+/**
+ * Protocol inspector: every traced message of a run, grouped by phase (OpenID4VCI / OpenID4VP),
+ * with keyboard navigation and a detail pane — Decoded (JWT, SD-JWT disclosures, URIs), Request
+ * (headers, body, copy as cURL) and Response. Row numbers match the sequence diagram's arrows.
+ */
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Activity, Braces, ChevronDown, ChevronUp, CircleAlert, Clock, Terminal, X } from 'lucide-react';
 import type { ProtocolEvent } from '../api';

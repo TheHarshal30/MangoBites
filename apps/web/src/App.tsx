@@ -1,3 +1,8 @@
+/**
+ * App shell: providers (theme, toasts, app data), header, status banners, and the hash router
+ * that picks the view. Routes: #playground[/<runId>], #matrix, #history, #wallet — hash-based so
+ * the UI works from any static host and the back/forward buttons follow view changes.
+ */
 import { useEffect } from 'react';
 import { RefreshCw, ServerCrash, WifiOff } from 'lucide-react';
 import { AppProvider, useApp } from './lib/app';

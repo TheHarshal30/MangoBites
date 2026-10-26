@@ -21,18 +21,34 @@ A single web app for running the full verifiable-credential cycle (**issue → h
 
 There are 17 findings in total; see [docs/INTEROP_GAPS.md](docs/INTEROP_GAPS.md).
 
+| Document | What's in it |
+|---|---|
+| [docs/API.md](docs/API.md) | The playground REST + WebSocket API, the reference issuer/verifier endpoints, and every Inji API we call |
+| [docs/TESTING.md](docs/TESTING.md) | Test data, test cases (unit, interop scenarios, edge cases) and their results |
+| [docs/architecture/](docs/architecture/README.md) | Architecture, run-flow and user-flow diagrams |
+| [docs/INTEROP_REPORT.md](docs/INTEROP_REPORT.md) | The latest full sweep: every issuer × verifier × format × scenario and its verdict |
+| [docs/INTEROP_GAPS.md](docs/INTEROP_GAPS.md) | The 17 findings in Inji Certify 0.14 and Inji Verify 0.16, with draft GitHub issues |
+
 ---
 
 ## Quick start
 
-Requirements: Docker with the compose plugin. Allow about 4 GB of RAM for the containers. On Apple Silicon the images run natively (arm64).
+**Requirements**
+- Docker with the Compose plugin (`docker compose version` should work). Nothing else is needed to run it; Node 22 is only needed for the CLI sweep and development.
+- About 4 GB of RAM free for the containers, and ~3 GB of disk for images. On Apple Silicon the images run natively (arm64).
+- Free ports **4000, 8090, 8082 and 5433**.
+
+**Steps**
 
 ```bash
+git clone https://github.com/TheHarshal30/MangoBites.git && cd MangoBites
 ./scripts/up.sh          # builds and starts everything, bootstraps Inji Certify
 open http://localhost:4000
 ```
 
-`up.sh` runs `docker compose --profile app up -d --build`. It then derives a `did:key` for Inji Certify's signing key, restarts Certify with that key as its issuer id, and registers the playground's credential configurations. It is idempotent, so re-running it is safe.
+The first run pulls the Inji images and builds the playground, so allow a few minutes; later runs take about 1½ minutes. When it prints `✔ Playground ready at http://localhost:4000`, open the page: the status pill in the top-right should read **All services up**. Pick an issuer, a wallet and a verifier, then press **Run flow**. For the full picture, open **Interop matrix** and press **Run sweep** (65 runs, about 10 seconds).
+
+`up.sh` runs `docker compose --profile app up -d --build`. It then derives a `did:key` for Inji Certify's signing key, restarts Certify with that key as its issuer id, and registers the playground's credential configurations. It is idempotent, so re-running it is safe. Stop everything with `docker compose --profile app down`; add `-v` to also delete run history and keys.
 
 Run the CI-style sweep from the command line:
 
@@ -60,6 +76,17 @@ npm test                         # unit tests for the credential formats and pro
 | 8090 | Inji Certify 0.14.0, behind nginx (`/v1/certify/*` plus the root `.well-known` documents) |
 | 8082 | Inji Verify service 0.16.0 (`/v1/verify/*`) |
 | 5433 | Postgres 15 (`inji_certify`, `inji_verify`) |
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `up.sh` fails with `port is already allocated` | Something else is using 4000, 8090, 8082 or 5433 | Stop that service, or change the host side of `ports:` in `docker-compose.yml` |
+| Status pill says **1 service down** right after start (Inji Certify *Unavailable* in its popover) | Certify takes 1–2 minutes to boot and generate its keys | Wait; the pill turns green on its own (it polls every 15 s) |
+| Certify shows **running, but not bootstrapped** | Credential configurations weren't registered (e.g. the stack was started with plain `docker compose up`) | Re-run `./scripts/up.sh` |
+| Genuine credentials verify as **INVALID** | The JSON-LD context mirror isn't in use, and www.w3.org rate-limited Inji's context fetches (gaps V3/C2) | Keep the `extra_hosts` lines in `docker-compose.yml`; re-run `./scripts/up.sh` |
+| A phone running Inji Wallet can't load the offer or request | The QR codes point at `localhost` | Set `PUBLIC_BASE_URL` / `VERIFY_PUBLIC_URL` (see *Testing with the Inji Wallet mobile app*) |
+| Want a clean slate | — | `docker compose --profile app down -v && ./scripts/up.sh` |
 
 ---
 
@@ -132,6 +159,10 @@ Inji Certify advertises `http://localhost:8090` as its issuer. To reach it from 
 
 ## Architecture
 
+![System architecture: the playground container (API, orchestrator, reference issuer/wallet/verifier, Inji adapters, tracer → WebSocket) next to Inji Certify, Inji Verify, Postgres and the JSON-LD context mirror](docs/architecture/architecture.png)
+
+More diagrams, including one run step by step and the user flow through the UI, are in [docs/architecture/](docs/architecture/README.md).
+
 ```
 apps/server (Node 22, TypeScript, Express + ws)
   actors/issuer.ts        Reference Issuer: OpenID4VCI draft 13, pre-authorized code, tx_code,
@@ -179,3 +210,22 @@ Design choices that matter:
 | *Bonus:* CI sweep · gap write-up and issue drafts · one-command bundle | `.github/workflows/interop.yml`, `docs/INTEROP_GAPS.md`, `scripts/up.sh` |
 | *Good to have:* same-device flow | **Open in wallet on this device** deep link (`openid-credential-offer://`, `openid4vp://`) in manual mode |
 | *Not done:* Digital Credentials API, Obsrv/Druid telemetry, Inji Web | — |
+
+## Submission artefacts (MOSIP Decode 2026)
+
+| Guideline item | Where |
+|---|---|
+| Source code | This repository (MPL-2.0), with the full commit history |
+| Working prototype | `./scripts/up.sh` → http://localhost:4000. A fresh install plus a full sweep was verified on 2026-10-26 (59 pass / 6 fail, identical to CI) |
+| Usage and installation | [Quick start](#quick-start), [Troubleshooting](#troubleshooting) |
+| API documentation | [docs/API.md](docs/API.md) |
+| Architecture diagram | [docs/architecture/](docs/architecture/README.md) |
+| Design mockups / user flow | [docs/architecture/](docs/architecture/README.md) (user-flow diagram) and the screenshots in this README |
+| Test data, test cases and results | [docs/TESTING.md](docs/TESTING.md), [docs/INTEROP_REPORT.md](docs/INTEROP_REPORT.md) |
+| Pitch deck, demo video | Shared with the submission email |
+
+## License
+
+[Mozilla Public License 2.0](LICENSE), the licence MOSIP uses for its own projects.
+
+The private keys under `docker/context-mirror/certs/` belong to a local test CA that is trusted only inside the playground's Inji containers, so the JSON-LD context mirror can serve `www.w3.org` over HTTPS. They protect nothing and are committed on purpose (made with OpenSSL from the committed `ca.ext` / `leaf.ext`). If you replace them, also replace the CA copies in `docker/inji-certify/` and `docker/inji-verify/` (`context-mirror-ca.crt`).

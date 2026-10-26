@@ -1,3 +1,7 @@
+/**
+ * Top bar: brand, main navigation (with a live-run dot, sweep progress and run count), the service
+ * status popover (Inji health, WebSocket state, endpoints) and the light/dark/system theme menu.
+ */
 import { FlaskConical, Grid3x3, History, Monitor, Moon, RefreshCw, Sun, Wallet, type LucideIcon } from 'lucide-react';
 import { useApp } from '../lib/app';
 import { routeHref, type Route, type View } from '../lib/router';

@@ -1,3 +1,4 @@
+/** Light / dark / system theme: preference persisted in localStorage, follows the OS when "system". */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 export type ThemePreference = 'light' | 'dark' | 'system';

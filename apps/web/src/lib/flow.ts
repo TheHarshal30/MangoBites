@@ -1,3 +1,9 @@
+/**
+ * The run configurator's model: scenarios and their expected verdicts, conversion to/from API run
+ * inputs, and the availability rules that explain *why* an option is disabled (e.g. "Inji Certify
+ * can't issue an expired JSON-LD credential"). Mirrors the server's validateInput() in runs.ts.
+ * The current selection is persisted so it survives reloads and tab switches.
+ */
 import { useSyncExternalStore } from 'react';
 import { BadgeCheck, FileWarning, Hourglass, Repeat, Tag, UserX, type LucideIcon } from 'lucide-react';
 import type { Catalog, Format, Party, RunSummary, Tamper, Verdict } from '../api';

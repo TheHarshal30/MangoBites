@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Inji Interoperability Playground · One run, message by message</title>
+<link rel="stylesheet" href="diagram.css">
+<style>
+  .head { position: absolute; z-index: 2; background: #fff; border: 1.5px solid; border-radius: 10px; padding: 8px 10px; text-align: center; transform: translateX(-50%); }
+  .head .role { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .head .title { font-size: 14.5px; font-weight: 650; color: var(--fg); margin-top: 1px; }
+  .head .meta { font-size: 11.5px; color: var(--subtle); margin-top: 1px; }
+
+  .phase { position: absolute; z-index: 2; left: 24px; display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--fg); background: #fff; padding-right: 10px; }
+  .phase .no { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-size: 11.5px; letter-spacing: 0; color: #fff; }
+  .phase .sub { font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--subtle); font-size: 12.5px; }
+  .rule { position: absolute; z-index: 0; left: 24px; right: 24px; height: 0; border-top: 1px solid var(--line); }
+
+  .mlabel { position: absolute; z-index: 3; transform: translateX(-50%); background: #fff; padding: 0 5px; text-align: center; font-size: 12.5px; font-weight: 600; color: var(--fg); line-height: 1.35; white-space: nowrap; border-radius: 4px; }
+  .mlabel small { display: block; font-size: 11px; font-weight: 500; color: var(--subtle); }
+  .mlabel.ret { font-size: 11.5px; font-weight: 500; color: var(--muted); }
+  .mlabel .num { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--subtle); margin-right: 2px; }
+  .mlabel code, .note code, .ins code { font-size: 0.88em; }
+
+  .note { position: absolute; z-index: 2; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: 9px 12px; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+  .note .t { font-weight: 650; color: var(--fg); font-size: 13px; }
+  .note ul { margin: 4px 0 0; padding: 0; list-style: none; }
+  .note li { margin-top: 3px; padding-left: 11px; position: relative; }
+  .note li::before { content: ''; position: absolute; left: 1px; top: .62em; width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; }
+
+  .insHead { position: absolute; z-index: 2; border: 1.5px solid #cbd5e1; border-radius: 10px; background: #fff; padding: 8px 12px; }
+  .insHead .role { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ref); }
+  .insHead .title { font-size: 14.5px; font-weight: 650; }
+  .insHead .meta { font-size: 11.5px; color: var(--subtle); }
+  .ins { position: absolute; z-index: 2; left: 1206px; width: 370px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 5px 10px; font-size: 12px; line-height: 1.4; color: var(--muted); }
+  .ins .r { display: flex; align-items: baseline; gap: 7px; }
+  .ins .num { font-family: var(--mono); font-size: 11px; color: var(--subtle); min-width: 24px; }
+  .ins .m { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--muted); border: 1px solid var(--line); background: #f8fafc; border-radius: 4px; padding: 0 4px; }
+  .ins .s { font-weight: 600; color: var(--fg); flex: 1; }
+  .ins .st { font-family: var(--mono); font-size: 10.5px; font-weight: 600; color: var(--pass); background: var(--pass-soft); border-radius: 4px; padding: 0 4px; }
+  .ins .dec { font-family: var(--mono); font-size: 10.5px; color: var(--fg); background: #f8fafc; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; margin: 5px 0 2px; line-height: 1.5; }
+  .ins .dec .k { color: #7c3aed; }
+  .ins .dec .lab { font-family: var(--sans); font-size: 10px; font-weight: 700; letter-spacing: .07em; color: var(--subtle); text-transform: uppercase; }
+  .ins.sel { border-color: #fdba74; background: #fffaf5; }
+  .ins .actor { font-size: 11px; font-weight: 600; min-width: 66px; }
+  .ins .badge { font-size: 10px; font-weight: 600; color: var(--issuer); border: 1px solid #ddd6fe; background: var(--issuer-soft); border-radius: 4px; padding: 0 4px; }
+
+  table.checks { border-collapse: separate; border-spacing: 0; width: 100%; margin-top: 8px; font-size: 12px; }
+  table.checks th { text-align: left; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--subtle); padding: 0 8px 6px; border-bottom: 1px solid var(--line); }
+  table.checks td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--muted); line-height: 1.4; }
+  table.checks tr:last-child td { border-bottom: 0; }
+  table.checks td:first-child { font-weight: 650; color: var(--fg); white-space: nowrap; }
+  table.checks tr.hl-n td { background: var(--nonce-soft); }
+  table.checks tr.hl-n td:first-child { box-shadow: inset 4px 0 0 var(--nonce); }
+  table.checks tr.hl-k td { background: var(--wallet-soft); }
+  table.checks tr.hl-k td:first-child { box-shadow: inset 4px 0 0 var(--wallet); }
+  .ok { color: var(--pass); font-weight: 650; white-space: nowrap; }
+  .no { color: var(--fail); font-weight: 650; }
+  .verdict { font-family: var(--mono); font-size: 11px; font-weight: 700; padding: 0 5px; border-radius: 4px; }
+  .verdict.v { color: var(--pass); background: var(--pass-soft); }
+  .verdict.i { color: var(--fail); background: var(--fail-soft); }
+  .res { display: inline-block; font-size: 11px; font-weight: 700; color: #fff; border-radius: 4px; padding: 0 6px; }
+  .res.p { background: var(--pass); }
+  .res.f { background: var(--fail); }
+</style>
+</head>
+<body>
+<div id="canvas">
+  <div class="heading">
+    <h1>One run, message by message</h1>
+    <p>Example: Inji Certify → Reference Wallet → Inji Verify, SD-JWT. With the Reference Issuer or Verifier the same messages go to <code>/issuer</code> and <code>/verifier</code> on the playground. Every exchange appears in the inspector under the number of its arrow in the UI's sequence diagram.</p>
+  </div>
+</div>
+
+<script src="diagram.js"></script>
+<script>
+const X = { orch: 150, issuer: 440, wallet: 760, verifier: 1080 };
+const canvas = document.getElementById('canvas');
+const C = D.C;
+const N = '<span class="tok n">N</span>', K = '<span class="tok k">K</span>';
+const queue = [];          // edges are drawn after D.init(), once the canvas height is known
+let y = 0, insBottom = 0;
+
+function div(cls, html, style = {}) {
+  const el = document.createElement('div');
+  el.className = cls;
+  el.innerHTML = html;
+  for (const [k, v] of Object.entries(style)) el.style[k] = typeof v === 'number' ? `${v}px` : v;
+  canvas.appendChild(el);
+  return el;
+}
+const line = (pts, opts) => queue.push(() => D.edge(pts, opts));
+
+function heads() {
+  const top = 140;
+  const h = (x, role, color, title, meta, w) => div('head', `<div class="role" style="color:${color}">${role}</div><div class="title">${title}</div><div class="meta">${meta}</div>`, { left: x, top, width: w, borderColor: color });
+  h(X.orch, 'Playground', '#475569', 'Orchestrator', '<code>runs.ts</code> + adapters', 196);
+  h(X.issuer, 'Issuer', C.issuer, 'Inji Certify 0.14.0', 'or the Reference Issuer', 216);
+  h(X.wallet, 'Wallet', C.wallet, 'Reference Wallet', 'or Inji Wallet, via QR codes', 216);
+  h(X.verifier, 'Verifier', C.verifier, 'Inji Verify 0.16.0', 'or the Reference Verifier', 216);
+  div('insHead', `<div class="role">Browser</div><div class="title">Protocol inspector</div><div class="meta"><code>http.ts</code> → event bus → WebSocket <code>/ws</code></div>`, { left: 1206, top, width: 370 });
+  y = 234;
+  insBottom = 234;
+}
+
+function phase(no, title, sub, color) {
+  y += 14;
+  div('rule', '', { top: y + 11 });
+  div('phase', `<span class="no" style="background:${color}">${no}</span>${title}<span class="sub">${sub}</span>`, { top: y });
+  y += 40;
+}
+
+function ins(html, top, cls = '') {
+  const el = div(`ins ${cls}`, html, { top: Math.max(top, insBottom + 6) });
+  insBottom = el.offsetTop + el.offsetHeight;
+  return el;
+}
+const ACTOR = { playground: '#475569', issuer: C.issuer, wallet: C.wallet, verifier: C.verifier };
+const row = (n, method, summary, status = '200', extra = '') =>
+  `<div class="r">${n ? `<span class="num">[${n}]</span><span class="m">${method}</span>` : `<span class="actor" style="color:${ACTOR[method]}">${method}</span>`}<span class="s">${summary}</span>${extra}${status ? `<span class="st">${status}</span>` : ''}</div>`;
+
+/** A request arrow (label above) and, optionally, a dashed response arrow. */
+function msg(o) {
+  const x1 = X[o.from], x2 = X[o.to];
+  const cx = (x1 + x2) / 2;
+  const lab = div('mlabel', `${o.n ? `<span class="num">[${o.n}]</span>` : ''}${o.label}${o.sub ? `<small>${o.sub}</small>` : ''}`, { left: cx, top: y });
+  const ay = y + lab.offsetHeight + 5;
+  line([[x1 + (x2 > x1 ? 4 : -4), ay], [x2 + (x2 > x1 ? -4 : 4), ay]], { color: o.color, start: 'dot' });
+  if (o.insp) ins(o.insp, ay - 15, o.sel ? 'sel' : '');
+  y = ay + 7;
+  if (o.ret) {
+    const rl = div('mlabel ret', o.ret, { left: cx, top: y });
+    const ry = y + rl.offsetHeight + 3;
+    line([[x2 + (x2 > x1 ? -4 : 4), ry], [x1 + (x2 > x1 ? 4 : -4), ry]], { color: o.color, dash: '5 4', width: 1.4 });
+    y = ry + 16;
+  } else {
+    y += 12;
+  }
+  y = Math.max(y, insBottom + 8);
+}
+
+function note(html, left, width, opts = {}) {
+  const el = div('note', html, { left, top: y, width, ...(opts.style ?? {}) });
+  if (opts.insp) ins(opts.insp, y + 4);
+  y += el.offsetHeight + (opts.gap ?? 16);
+  y = Math.max(y, insBottom + 8);
+  return el;
+}
+
+document.fonts.ready.then(() => {
+  heads();
+
+  /* 0 · Start */
+  phase('0', 'Start', 'the browser starts a run', '#475569');
+  const sl = div('mlabel', 'Run flow · <code>POST /api/runs</code><small>the browser then follows the run over WebSocket <code>/ws</code></small>', { left: (X.orch + 1206) / 2, top: y });
+  const sy = y + sl.offsetHeight + 5;
+  line([[1202, sy], [X.orch + 4, sy]], { color: C.ctl, start: 'dot' });
+  ins(row('', 'playground', 'Run: Inji Certify → Reference Wallet → Inji Verify · SD-JWT · expecting VALID', ''), sy + 12);
+  y = Math.max(sy + 18, insBottom + 8);
+  note(`<div class="t">Expected verdict comes from the scenario</div>
+    Happy path → <span class="verdict v">VALID</span> · Expired credential → <span class="verdict v" style="color:#b45309;background:#fffbeb">EXPIRED</span> · Bad signature, Wrong type, Replay, Wrong holder → <span class="verdict i">INVALID</span>`, 206, 820, { gap: 8 });
+
+  /* 1 · Issue */
+  phase('1', 'Issue', 'OpenID4VCI draft 13 · pre-authorized code', C.issuer);
+  msg({ n: 1, from: 'orch', to: 'issuer', color: C.ctl, label: 'Create a pre-authorized offer', sub: 'Inji Certify: <code>POST /pre-authorized-data</code></small><small>Reference Issuer: in-process',
+    ret: '<code>credential_offer_uri</code>', insp: row(1, 'POST', 'Create offer (/pre-authorized-data)') });
+  msg({ from: 'orch', to: 'wallet', color: C.ctl, label: 'Offer URI <code>openid-credential-offer://…</code>', sub: 'Inji Wallet: the run view shows it as a QR code (and a deep link)',
+    insp: row('', 'wallet', 'Credential offer, scanned by reference', '', '<span class="badge">{ }</span>') });
+  msg({ n: 2, from: 'wallet', to: 'issuer', color: C.issuer, label: 'GET <code>credential_offer_uri</code>', ret: 'issuer, configuration id, <code>pre-authorized_code</code>', insp: row(2, 'GET', 'Resolve credential_offer_uri') });
+  msg({ n: 3, from: 'wallet', to: 'issuer', color: C.issuer, label: 'GET <code>/.well-known/openid-credential-issuer</code>', ret: 'credential endpoint, formats, proof algorithms', insp: row(3, 'GET', 'Issuer metadata') });
+  msg({ n: 4, from: 'wallet', to: 'issuer', color: C.issuer, label: 'GET <code>/.well-known/oauth-authorization-server</code>', ret: '<code>token_endpoint</code>', insp: row(4, 'GET', 'Authorization server metadata') });
+  msg({ n: 5, from: 'wallet', to: 'issuer', color: C.issuer, label: 'POST token · <code>pre-authorized_code</code> (+ <code>tx_code</code>)', ret: '<code>access_token</code>, <code>c_nonce</code>', insp: row(5, 'POST', 'Token request (pre-authorized_code)') });
+  msg({ n: 6, from: 'wallet', to: 'issuer', color: C.issuer, sel: true, label: `POST credential · proof JWT signed with holder key ${K}`,
+    sub: '<code>typ: openid4vci-proof+jwt</code> · <code>aud</code> = issuer · <code>nonce</code> = c_nonce</small><small>the issuer checks all three',
+    ret: `credential bound to ${K} (<code>credentialSubject.id</code> or <code>cnf</code>)`,
+    insp: row(6, 'POST', 'Credential request (proof of possession)', '200', '<span class="badge">JWT</span>') +
+      `<div class="dec"><span class="lab">proof JWT · header</span><br>{ <span class="k">"typ"</span>: "openid4vci-proof+jwt", <span class="k">"kid"</span>: ${K} }<br><span class="lab">payload</span><br>{ <span class="k">"aud"</span>: issuer, <span class="k">"iat"</span>: …, <span class="k">"nonce"</span>: c_nonce }</div>` });
+
+  /* 2 · Hold */
+  phase('2', 'Hold', 'the wallet keeps the credential', C.wallet);
+  note(`<div class="t">Wallet stores the credential</div><code>data/wallet.json</code>, listed in the Wallet tab. A phone wallet keeps it on the device; the run waits for <b>Credential received</b>.`,
+    X.wallet - 170, 340, { insp: row('', 'wallet', 'Credential stored (vc+sd-jwt)', '', '<span class="badge">{ }</span>') });
+
+  /* 3 · Present */
+  phase('3', 'Present', 'OpenID4VP draft 21 · response_mode direct_post', C.verifier);
+  msg({ n: 7, from: 'orch', to: 'verifier', color: C.ctl, label: `Create a VP request with nonce ${N} and a presentation definition`, sub: 'Inji Verify: <code>POST /vp-request</code> · Reference Verifier: in-process',
+    ret: `<code>openid4vp://authorize?</code> client_id, response_uri, nonce ${N}, state, presentation_definition`, insp: row(7, 'POST', 'Create VP request (/vp-request)', '201', '<span class="badge">PD</span>') });
+  msg({ from: 'orch', to: 'wallet', color: C.ctl, label: 'Authorization request URI', sub: 'Inji Wallet: shown as a QR code (and a deep link)', insp: row('', 'verifier', 'Authorization request, presentation definition attached', '', '<span class="badge">PD</span>') });
+  msg({ from: 'wallet', to: 'verifier', color: C.verifier, label: 'GET <code>presentation_definition_uri</code>', sub: 'Reference Verifier only;</small><small>Inji Verify sends the definition inline', ret: 'type / vct / doctype, requested claims', insp: row('', 'wallet', 'Wallet parsed the request; credential matches', '', '<span class="badge">{ }</span>') });
+  note(`<div class="t">Wallet builds a vp_token bound to ${N} and ${K}</div>
+    <ul>
+      <li><b>JSON-LD</b>: <code>ldp_vp</code> proof with <code>challenge</code> = ${N}, <code>domain</code> = client_id, signed with ${K}</li>
+      <li><b>SD-JWT</b>: KB-JWT with <code>nonce</code> = ${N}, <code>aud</code> = client_id, <code>sd_hash</code>, signed with ${K}; only the requested claims disclosed</li>
+      <li><b>mDoc</b>: DeviceAuth over the SessionTranscript (${N}, client_id), signed with ${K}</li>
+    </ul>
+    <div style="margin-top:6px; padding-top:6px; border-top:1px solid var(--line);"><b style="color:var(--fg)">Scenario hooks</b> · Replay: binds the proof to a stale nonce instead of ${N} · Wrong holder: signs with a key other than ${K} · Bad signature: edits a signed claim · Wrong type: rewrites type / vct</div>`,
+    470, 600, { insp: row('', 'wallet', 'Selective disclosure: fullName, dateOfBirth', '', '<span class="badge">{ }</span>') });
+  msg({ n: 8, from: 'wallet', to: 'verifier', color: C.verifier, sel: true, label: 'POST <code>response_uri</code> (direct_post)', sub: '<code>vp_token</code> + <code>presentation_submission</code> + <code>state</code></small><small>Inji Verify: <code>/vp-submission/direct-post</code>', ret: '200',
+    insp: row(8, 'POST', 'Authorization response (direct_post)', '200', '<span class="badge">SD-JWT</span>') +
+      `<div class="dec"><span class="lab">KB-JWT · payload</span><br>{ <span class="k">"nonce"</span>: ${N}, <span class="k">"aud"</span>: client_id, <span class="k">"sd_hash"</span>: … }<br><span class="lab">signed with</span> ${K} <span style="color:var(--subtle)">· must match the credential's cnf</span></div>` });
+
+  /* 4 · Verify */
+  phase('4', 'Verify', 'the verifier decides; the orchestrator collects the verdict', C.verifier);
+  note(`<div class="t">What each scenario tests, and the verdict each verifier returned <span style="font-weight:500; color:var(--subtle)">(latest sweep, docs/INTEROP_REPORT.md)</span></div>
+    <table class="checks">
+      <tr><th>Scenario</th><th>What the verifier has to check</th><th>Reference Verifier</th><th>Inji Verify · OpenID4VP</th></tr>
+      <tr><td>Bad signature</td><td>issuer signature over the credential (a signed claim was edited)</td><td class="ok">✓ INVALID</td><td class="ok">✓ INVALID</td></tr>
+      <tr><td>Wrong type</td><td>type / vct rewritten after signing</td><td class="ok">✓ INVALID</td><td class="ok">✓ INVALID</td></tr>
+      <tr><td>Expired credential</td><td>validity period: expirationDate / exp</td><td class="ok">✓ EXPIRED</td><td class="ok">✓ EXPIRED</td></tr>
+      <tr class="hl-n"><td>Replay · nonce</td><td>proof challenge or KB-JWT nonce = ${N}; domain / aud = client_id</td><td class="ok">✓ INVALID</td><td><span class="no">✗ VALID</span> for every format (gap V1)</td></tr>
+      <tr class="hl-k"><td>Wrong holder · binding</td><td>VP signer = credentialSubject.id; KB-JWT key = <span style="white-space:nowrap">cnf (${K})</span></td><td class="ok">✓ INVALID</td><td><span class="no">✗ VALID</span> for JSON-LD (gap V2); <span style="white-space:nowrap">SD-JWT ✓ INVALID</span></td></tr>
+    </table>`, 230, 966, { gap: 18 });
+  msg({ n: 9, from: 'orch', to: 'verifier', color: C.ctl, label: 'GET <code>/vp-request/{id}/status</code> (poll)', sub: 'Inji Verify only; the Reference Verifier hands its result over in-process', ret: '<code>VP_SUBMITTED</code>', insp: row(9, 'GET', 'Poll status (Inji Verify)') });
+  msg({ n: 10, from: 'orch', to: 'verifier', color: C.ctl, label: 'GET <code>/vp-result/{transactionId}</code>', ret: '<code>vpResultStatus</code>, <code>vcResults[].verificationStatus</code> → VALID / EXPIRED / INVALID', insp: row(10, 'GET', 'Fetch result (/vp-result)') });
+
+  /* 5 · Grade */
+  phase('5', 'Grade', 'runs.ts compares the verdict with the expected one', '#475569');
+  note(`<div class="t">PASS only if actual = expected</div>
+    <table class="checks">
+      <tr><th>Scenario</th><th>Verifier</th><th>Actual</th><th>Expected</th><th>Run</th></tr>
+      <tr><td>Happy path</td><td>every verifier in the sweep</td><td><span class="verdict v">VALID</span></td><td><span class="verdict v">VALID</span></td><td><span class="res p">PASS</span></td></tr>
+      <tr><td>Replay</td><td>Reference Verifier</td><td><span class="verdict i">INVALID</span></td><td><span class="verdict i">INVALID</span></td><td><span class="res p">PASS</span></td></tr>
+      <tr class="hl-n"><td>Replay</td><td>Inji Verify · OpenID4VP</td><td><span class="verdict v">VALID</span></td><td><span class="verdict i">INVALID</span></td><td><span class="res f">FAIL</span> gap V1</td></tr>
+      <tr class="hl-k"><td>Wrong holder (JSON-LD)</td><td>Inji Verify · OpenID4VP</td><td><span class="verdict v">VALID</span></td><td><span class="verdict i">INVALID</span></td><td><span class="res f">FAIL</span> gap V2</td></tr>
+    </table>`, 206, 690, { gap: 14 });
+  const gl = div('mlabel', 'Run update over WebSocket <code>/ws</code><small>run saved to <code>data/runs/&lt;id&gt;.json</code>; the verdict panel, Run history and Interop matrix update</small>', { left: (X.orch + 1206) / 2, top: y });
+  const gy = y + gl.offsetHeight + 5;
+  line([[X.orch + 4, gy], [1202, gy]], { color: C.ctl, start: 'dot' });
+  ins(row('', 'playground', 'Report: PASS, verifier returned VALID, expected VALID', ''), gy + 12);
+  y = Math.max(gy + 30, insBottom + 20);
+
+  /* Legend */
+  div('legend', `<span class="title">Legend</span>
+    <span class="item"><span class="tok n">N</span> nonce from the verifier's request</span>
+    <span class="item"><span class="tok k">K</span> holder key the credential is bound to</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#7c3aed" stroke-width="2"/></svg>OpenID4VCI</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#0d9488" stroke-width="2"/></svg>OpenID4VP</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#475569" stroke-width="2"/></svg>orchestrator ↔ party (REST or in-process)</span>
+    <span class="item"><svg width="30" height="10"><line x1="0" y1="5" x2="30" y2="5" stroke="#475569" stroke-width="1.4" stroke-dasharray="5 4"/></svg>response</span>
+    <span class="item"><span style="display:inline-block;width:14px;height:14px;border-radius:4px;border:1px solid #fdba74;background:#fffaf5"></span>inspector row expanded (decoded)</span>`,
+    { left: 24, top: y, width: 1552 });
+  y += 40;
+
+  canvas.style.height = `${y}px`;
+  D.init();
+  queue.forEach((f) => f());
+  /* lifelines, behind everything else */
+  const top = 140 + document.querySelector('.head').offsetHeight;
+  for (const [k, x] of Object.entries(X)) {
+    const l = D.el('line', { x1: x, y1: top, x2: x, y2: y - 52, stroke: '#cbd5e1', 'stroke-width': 1.5, 'stroke-dasharray': '4 4' });
+    l.parentNode.insertBefore(l, l.parentNode.children[1]);
+  }
+  window.__issues = D.audit('.note, .ins, .head, .insHead');
+  window.__ready = true;
+});
+</script>
+</body>
+</html>

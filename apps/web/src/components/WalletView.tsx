@@ -1,3 +1,7 @@
+/**
+ * Wallet view: the credentials held by the headless Reference Wallet, as filterable cards with a
+ * detail sheet (claims, metadata, raw credential). Refreshes when a run that used the wallet finishes.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, CircleAlert, FlaskConical, RefreshCw, RotateCcw, SearchX, Wallet, X } from 'lucide-react';
 import { api, useLive, useOnReconnect, type Format, type WalletCredential } from '../api';

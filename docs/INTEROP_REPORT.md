@@ -1,6 +1,6 @@
 # Inji Interoperability Report
 
-Generated 2026-10-18T00:47:43.346Z · 65 runs · **59 pass / 6 fail**
+Generated 2026-10-26T17:37:42.074Z · 65 runs · **59 pass / 6 fail**
 
 A run **passes** when the verifier reaches the verdict the scenario calls for: `VALID` for the happy path, `EXPIRED` for an expired credential, `INVALID` for every tamper mode. A verifier that accepts a forged or replayed presentation therefore *fails* that row.
 

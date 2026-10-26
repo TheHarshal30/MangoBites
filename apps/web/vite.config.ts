@@ -1,3 +1,7 @@
+/**
+ * Vite config. In development the UI runs on :5173 and proxies /api and /ws to the playground
+ * server on :4000; in production the server serves the built files itself.
+ */
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';

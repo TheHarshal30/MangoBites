@@ -1,3 +1,7 @@
+/**
+ * Interop matrix: starts a full sweep and shows the latest result per issuer × format × verifier ×
+ * scenario cell (pass / fail / not run / not applicable / not supported), plus a list of failures.
+ */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ArrowUpRight, Ban, Check, CircleCheck, CircleX, Download, Gauge, Grid3x3, LoaderCircle, Play, Plus, Radio, X,

@@ -1,0 +1,126 @@
+/* Shared styles for the architecture diagrams. Rendered to PNG by render.py (Playwright, 2x). */
+@font-face {
+  font-family: 'Inter Diagram';
+  src: url('../../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 900;
+}
+@font-face {
+  font-family: 'Mono Diagram';
+  src: url('../../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 800;
+}
+
+:root {
+  --issuer: #7c3aed;
+  --wallet: #2563eb;
+  --verifier: #0d9488;
+  --inji: #ea580c;
+  --ref: #475569;
+  --infra: #6b7280;
+
+  --issuer-soft: #f5f3ff;
+  --wallet-soft: #eff6ff;
+  --verifier-soft: #f0fdfa;
+  --inji-soft: #fff7ed;
+  --ref-soft: #f8fafc;
+  --infra-soft: #f9fafb;
+
+  --nonce: #db2777;
+  --nonce-soft: #fdf2f8;
+  --pass: #15803d;
+  --pass-soft: #f0fdf4;
+  --fail: #dc2626;
+  --fail-soft: #fef2f2;
+
+  --fg: #0f172a;
+  --muted: #475569;
+  --subtle: #64748b;
+  --line: #e2e8f0;
+  --sans: 'Inter Diagram', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'Mono Diagram', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #fff; }
+body { font-family: var(--sans); color: var(--fg); -webkit-font-smoothing: antialiased; font-feature-settings: 'cv11', 'ss01'; }
+
+#canvas { position: relative; width: 1600px; background: #fff; overflow: hidden; }
+
+/* ── Heading ─────────────────────────────────────────── */
+.heading { position: absolute; left: 40px; top: 30px; right: 40px; }
+.heading h1 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.015em; }
+.heading p { margin: 6px 0 0; font-size: 14.5px; line-height: 1.5; color: var(--muted); max-width: 1180px; }
+.heading .kicker { font-size: 12px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--inji); margin-bottom: 6px; }
+
+/* ── Frames (deployment boundaries, groups) ──────────── */
+.frame { position: absolute; border: 1.5px dashed #94a3b8; border-radius: 16px; z-index: 0; }
+.frame.solid { border-style: solid; border-color: #cbd5e1; }
+.frame.tint-infra { background: #f8fafc; }
+.frame.tint-inji { background: #fffaf5; border-color: #fdba74; }
+.frame.tint-ref { background: #fbfcfd; }
+.frame-label { position: absolute; font-size: 12px; font-weight: 650; color: var(--muted); letter-spacing: .01em; white-space: nowrap; z-index: 2; }
+.frame-label .sub { font-weight: 500; color: var(--subtle); margin-left: 6px; }
+.frame-label.caps { text-transform: uppercase; letter-spacing: .07em; font-size: 11px; }
+
+/* ── Nodes ───────────────────────────────────────────── */
+.node {
+  position: absolute; z-index: 2; background: #fff; border: 1.5px solid #cbd5e1; border-radius: 10px;
+  padding: 10px 12px; font-size: 12.5px; line-height: 1.42; color: var(--muted);
+}
+.node.ref { border-color: var(--ref); }
+.node.inji { border-color: var(--inji); }
+.node.infra { border-color: #9ca3af; background: var(--infra-soft); }
+.node.ctl { border-color: #cbd5e1; }
+.node .role { font-size: 10.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 1px; display: flex; align-items: center; justify-content: space-between; gap: 6px; min-height: 17px; }
+.node .role .pill { letter-spacing: 0; text-transform: none; }
+.node .title { font-size: 14.5px; font-weight: 650; color: var(--fg); line-height: 1.3; }
+.node .title .v { font-weight: 500; color: var(--subtle); font-size: 12.5px; margin-left: 2px; }
+.node .meta { font-size: 11.5px; color: var(--subtle); margin-top: 1px; }
+.node ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.node li { position: relative; padding-left: 11px; margin-top: 2px; }
+.node li::before { content: ''; position: absolute; left: 1px; top: 0.62em; width: 4px; height: 4px; border-radius: 50%; background: #94a3b8; }
+.node p { margin: 5px 0 0; }
+.node hr { border: 0; border-top: 1px solid var(--line); margin: 7px 0; }
+
+.c-issuer { color: var(--issuer); }
+.c-wallet { color: var(--wallet); }
+.c-verifier { color: var(--verifier); }
+.c-inji { color: var(--inji); }
+.c-ref { color: var(--ref); }
+.c-infra { color: var(--infra); }
+.c-pass { color: var(--pass); }
+.c-fail { color: var(--fail); }
+
+.pill { display: inline-block; font-size: 10.5px; font-weight: 600; padding: 0 6px; border-radius: 5px; line-height: 17px; vertical-align: 1px; white-space: nowrap; }
+.pill.inji { color: #c2410c; background: #fff7ed; border: 1px solid #fed7aa; }
+.pill.ref { color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; }
+.pill.infra { color: #4b5563; background: #f3f4f6; border: 1px solid #e5e7eb; }
+.pill.opt { color: #475569; background: #fff; border: 1px dashed #94a3b8; }
+.pill.pass { color: var(--pass); background: var(--pass-soft); border: 1px solid #bbf7d0; }
+.pill.fail { color: var(--fail); background: var(--fail-soft); border: 1px solid #fecaca; }
+
+.mono, code { font-family: var(--mono); font-size: 0.9em; }
+code { color: var(--fg); }
+.node code { white-space: nowrap; }
+
+/* Tokens that thread through the run-flow diagram */
+.tok { display: inline-block; font-family: var(--mono); font-size: 0.88em; font-weight: 600; border-radius: 4px; padding: 0 4px; line-height: 1.45; white-space: nowrap; }
+.tok.n { color: var(--nonce); background: var(--nonce-soft); border: 1px solid #fbcfe8; }
+.tok.k { color: var(--wallet); background: var(--wallet-soft); border: 1px solid #bfdbfe; }
+
+/* ── Edge labels ─────────────────────────────────────── */
+.elabel {
+  position: absolute; z-index: 3; transform: translate(-50%, -50%); background: #fff; padding: 1px 5px;
+  font-size: 11.5px; font-weight: 650; white-space: nowrap; line-height: 1.3; text-align: center; border-radius: 4px;
+}
+.elabel small { display: block; font-weight: 500; color: var(--subtle); font-size: 10.5px; }
+.elabel.clear { background: transparent; }
+
+/* ── Legend ──────────────────────────────────────────── */
+.legend { position: absolute; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 17px; align-items: center; font-size: 12px; color: var(--muted); }
+.legend .item { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.legend .sw { width: 14px; height: 14px; border-radius: 4px; border: 2px solid; background: #fff; }
+.legend svg { overflow: visible; }
+.legend .title { font-weight: 650; color: var(--fg); text-transform: uppercase; letter-spacing: .07em; font-size: 11px; }
+
+.thumb { display: block; width: 100%; border-radius: 6px; border: 1px solid var(--line); background: #fff; object-fit: cover; object-position: top left; }

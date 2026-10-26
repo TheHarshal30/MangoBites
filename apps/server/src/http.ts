@@ -1,3 +1,10 @@
+/**
+ * Traced HTTP client. Every outgoing protocol call (wallet → issuer, playground → Inji, …) goes
+ * through `traced()`, which records the full request/response pair — plus decoded JWT / SD-JWT /
+ * VP artefacts — as a ProtocolEvent on the run's timeline. That is what feeds the inspector and the
+ * sequence diagram: the playground sees every payload because it is a party to every exchange,
+ * not because it sniffs network traffic.
+ */
 import { emit, type Actor } from './events.js';
 import { decodeArtefacts } from './util/decode.js';
 

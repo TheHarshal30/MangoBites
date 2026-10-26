@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { certifyDidKey, certifyHealth, upsertCertifyConfigs } from '../adapters/inji-certify.js';
 import { verifyHealth } from '../adapters/inji-verify.js';
 import { bus, type ProtocolEvent } from '../events.js';
+import { retry } from '../util/retry.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const envFile = path.join(root, '.env');
@@ -37,7 +38,10 @@ console.log('▸ Waiting for Inji Certify and Inji Verify…');
 await waitFor('Inji Certify', certifyHealth);
 await waitFor('Inji Verify', verifyHealth);
 
-const did = await certifyDidKey();
+// Certify answers HTTP before its startup key setup finishes: on a fresh database the DID document
+// can be served a few hundred ms before the Ed25519 key is generated and added to it. Reading it
+// once made `./scripts/up.sh` fail intermittently on clean machines (CI runs on 2026-10-18/19/25).
+const did = await retry("Inji Certify's Ed25519 key", certifyDidKey);
 if (process.argv.includes('--print-did')) {
   console.log(did);
   process.exit(0);

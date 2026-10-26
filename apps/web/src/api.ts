@@ -1,3 +1,8 @@
+/**
+ * API client and live updates. Typed fetchers for the playground REST API (docs/API.md), plus a
+ * single shared WebSocket that fans protocol events and run updates out to subscribers, reconnects
+ * with backoff, and lets views refetch after a drop so they never show stale state silently.
+ */
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type Format = 'ldp_vc' | 'vc+sd-jwt' | 'mso_mdoc';
