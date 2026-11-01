@@ -7,6 +7,7 @@
     "dev": "node --import tsx --watch src/index.ts",
     "start": "node --import tsx src/index.ts",
     "typecheck": "node ../../node_modules/typescript/bin/tsc -p .",
+    "build": "npm run typecheck",
     "setup": "node --import tsx src/cli/setup.ts",
     "interop": "node --import tsx src/cli/interop.ts",
     "test": "node --import tsx --test src/test/*.test.ts"
